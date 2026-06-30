@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     social_step_max_frames: int = 24
     step_clip_seconds: float = 3.5
     ytdlp_cookies_file: Optional[str] = None
+    # Netscape-format cookies (for Render/cloud when a file path is not available).
+    ytdlp_cookies: Optional[str] = None
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     google_client_id: Optional[str] = None

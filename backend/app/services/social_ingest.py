@@ -23,6 +23,27 @@ _WHISPER_EXTENSIONS = {".m4a", ".mp3", ".mp4", ".mpeg", ".mpga", ".wav", ".webm"
 # Short-form platforms: silent reels with on-screen text are common — always analyze video.
 SHORT_FORM_PLATFORMS = frozenset({"instagram", "tiktok", "facebook", "pinterest"})
 
+_LOGIN_REQUIRED_DETAIL = (
+    "Could not access this post automatically. "
+    "Paste the caption in the optional Caption field, then click Import again. "
+    "For automatic fetch on the server, set YTDLP_COOKIES or YTDLP_COOKIES_FILE."
+)
+
+_ytdlp_cookies_cache_path: Optional[str] = None
+
+
+def _ytdlp_cookie_file() -> Optional[str]:
+    global _ytdlp_cookies_cache_path
+    if settings.ytdlp_cookies_file:
+        return settings.ytdlp_cookies_file
+    if not settings.ytdlp_cookies or not settings.ytdlp_cookies.strip():
+        return None
+    if _ytdlp_cookies_cache_path is None:
+        path = Path(tempfile.gettempdir()) / "ytdlp_cookies.txt"
+        path.write_text(settings.ytdlp_cookies.strip() + "\n", encoding="utf-8")
+        _ytdlp_cookies_cache_path = str(path)
+    return _ytdlp_cookies_cache_path
+
 
 def _normalize_url(url: str) -> str:
     cleaned = url.strip()
@@ -115,8 +136,9 @@ def _ytdlp_options(**extra: object) -> dict:
         "socket_timeout": 45,
         **extra,
     }
-    if settings.ytdlp_cookies_file:
-        opts["cookiefile"] = settings.ytdlp_cookies_file
+    cookie_file = _ytdlp_cookie_file()
+    if cookie_file:
+        opts["cookiefile"] = cookie_file
     return opts
 
 
@@ -137,10 +159,7 @@ def _extract_with_ytdlp(url: str) -> dict:
         if "login" in message.lower() or "cookies" in message.lower():
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Could not access this post automatically. "
-                    "Paste the caption below, or set YTDLP_COOKIES_FILE in backend/.env for Instagram/Facebook."
-                ),
+                detail=_LOGIN_REQUIRED_DETAIL,
             ) from exc
         if "blocked" in message.lower() or "ip address" in message.lower():
             raise HTTPException(
@@ -156,10 +175,7 @@ def _extract_with_ytdlp(url: str) -> dict:
         if "login" in message or "cookies" in message:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Could not access this post automatically. "
-                    "Paste the caption below, or set YTDLP_COOKIES_FILE in backend/.env for Instagram/Facebook."
-                ),
+                detail=_LOGIN_REQUIRED_DETAIL,
             ) from exc
         if "blocked" in message or "ip address" in message:
             raise HTTPException(

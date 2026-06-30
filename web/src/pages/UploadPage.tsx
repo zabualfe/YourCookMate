@@ -175,9 +175,15 @@ export function UploadPage() {
             </button>
 
             {ingestMutation.isError && (
-              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-                {(ingestMutation.error as Error).message}
-              </p>
+              <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p>{(ingestMutation.error as Error).message}</p>
+                {(ingestMutation.error as Error).message.includes('caption') && (
+                  <p className="mt-2 text-red-600/90">
+                    Open the post, copy the caption, paste it into the <strong>Caption</strong> field above,
+                    then click Import again — no server cookies needed.
+                  </p>
+                )}
+              </div>
             )}
 
             {extracted && (

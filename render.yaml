@@ -58,3 +58,7 @@ services:
         value: "false"
       - key: INSTACART_ENABLED
         value: "false"
+      - key: YTDLP_COOKIES
+        sync: false
+      - key: YTDLP_COOKIES_FILE
+        sync: false

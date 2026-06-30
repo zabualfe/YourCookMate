@@ -10,7 +10,8 @@
     "dev:backend": "node scripts/run-backend.js",
     "dev:web": "npm run dev --prefix web",
     "dev:mobile": "npm run start --prefix mobile",
-    "ios": "npm run ios --prefix mobile"
+    "ios": "npm run ios --prefix mobile",
+    "export:cookies": "bash scripts/export-ytdlp-cookies.sh"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
