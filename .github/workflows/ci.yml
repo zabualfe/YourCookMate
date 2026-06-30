@@ -9,6 +9,7 @@ name: CI
 #
 # Vercel project (Root Directory = web) env vars:
 #   VITE_API_URL — production API URL
+#   SITE_PASSWORD — optional; password-protects the public site (Basic Auth)
 
 on:
   push:
