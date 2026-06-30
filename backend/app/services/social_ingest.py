@@ -267,13 +267,17 @@ def _transcribe_audio(url: str) -> Optional[str]:
         if not audio_files:
             return None
 
-        client = OpenAI(api_key=settings.openai_api_key)
-        with audio_files[0].open("rb") as audio_file:
-            result = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="text",
-            )
+        try:
+            client = OpenAI(api_key=settings.openai_api_key)
+            with audio_files[0].open("rb") as audio_file:
+                result = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="text",
+                )
+        except Exception:
+            return None
+
         text = (result if isinstance(result, str) else getattr(result, "text", "")).strip()
         if len(text) < 12:
             return None
@@ -389,7 +393,9 @@ def _run_audio_step(
     elif not settings.openai_api_key:
         notes.append("Audio transcription skipped (OPENAI_API_KEY not set).")
     else:
-        notes.append("No speech detected or could not transcribe audio.")
+        notes.append(
+            "No speech detected, could not transcribe audio, or OPENAI_API_KEY is invalid on the server."
+        )
     return transcript
 
 

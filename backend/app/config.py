@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -62,6 +63,19 @@ class Settings(BaseSettings):
     instacart_connect_client_secret: Optional[str] = None
     instacart_connect_api_base: str = "https://connect.dev.instacart.tools"
     instacart_connect_authorize_url: Optional[str] = None
+
+    @field_validator(
+        "openai_api_key",
+        "resend_api_key",
+        "google_client_secret",
+        mode="before",
+    )
+    @classmethod
+    def strip_secret(cls, value: object) -> object:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return cleaned or None
+        return value
 
     @property
     def smtp_pass(self) -> Optional[str]:

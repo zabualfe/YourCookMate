@@ -145,13 +145,17 @@ def transcribe_cached_video(video_path: Path) -> Optional[str]:
         if not extract_audio_from_video(video_path, audio_path):
             return None
 
-        client = OpenAI(api_key=settings.openai_api_key)
-        with audio_path.open("rb") as audio_file:
-            result = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="text",
-            )
+        try:
+            client = OpenAI(api_key=settings.openai_api_key)
+            with audio_path.open("rb") as audio_file:
+                result = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="text",
+                )
+        except Exception:
+            return None
+
         text = (result if isinstance(result, str) else getattr(result, "text", "")).strip()
         if len(text) < 12:
             return None
