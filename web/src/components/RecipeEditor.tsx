@@ -53,9 +53,6 @@ export function RecipeEditor({ draft, onChange, activeTab, onTabChange }: Recipe
   const activeIngredient = activeIngredientId
     ? draft.ingredients.find((ing) => ing._key === activeIngredientId)
     : null
-  const activeIngredientIndex = activeIngredient
-    ? draft.ingredients.findIndex((ing) => ing._key === activeIngredientId)
-    : -1
 
   const activeStep = activeStepId ? draft.steps.find((step) => step._key === activeStepId) : null
   const activeStepIndex = activeStep ? draft.steps.findIndex((step) => step._key === activeStepId) : -1
@@ -187,7 +184,6 @@ export function RecipeEditor({ draft, onChange, activeTab, onTabChange }: Recipe
                     <SortableIngredientRow
                       key={ing._key}
                       id={ing._key}
-                      index={i}
                       ingredient={ing}
                       onUpdate={(patch) => updateIngredient(i, patch)}
                       onRemove={() => removeIngredient(i)}
@@ -269,13 +265,11 @@ export function RecipeEditor({ draft, onChange, activeTab, onTabChange }: Recipe
 
 function SortableIngredientRow({
   id,
-  index,
   ingredient,
   onUpdate,
   onRemove,
 }: {
   id: string
-  index: number
   ingredient: EditorIngredient
   onUpdate: (patch: Partial<Ingredient>) => void
   onRemove: () => void

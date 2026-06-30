@@ -5,7 +5,7 @@ import { Layout } from '../components/Layout'
 import { ShareQuickAdd } from '../components/SharePanel'
 import { CollectionQuickAdd } from '../components/CollectionPicker'
 import { RecipeCollectionChips } from '../components/RecipeCollectionChips'
-import { RecipeEditor, cloneRecipe, normalizeRecipe } from '../components/RecipeEditor'
+import { RecipeEditor, cloneRecipe, normalizeRecipe, type EditorRecipe } from '../components/RecipeEditor'
 import { RecipeNutritionFields, RecipeNutritionInfo } from '../components/RecipeNutritionInfo'
 import { RecipeSourceLink } from '../components/RecipeSourceLink'
 import { ShopInstacartButton } from '../components/ShopInstacartButton'
@@ -26,7 +26,7 @@ export function RecipeDetailPage() {
   const [local, setLocal] = useState(() => (id ? getLocalRecipe(id) : undefined))
   const [activeTab, setActiveTab] = useState<'ingredients' | 'steps'>('ingredients')
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<ParsedRecipe | null>(null)
+  const [draft, setDraft] = useState<EditorRecipe | null>(null)
   const [saveError, setSaveError] = useState('')
   const [iconUrl, setIconUrl] = useState<string | null | undefined>(undefined)
 
@@ -135,7 +135,19 @@ export function RecipeDetailPage() {
     saveMutation.mutate(normalized)
   }
 
-  const updateMeta = (patch: Partial<ParsedRecipe>) => {
+  const updateMeta = (
+    patch: Partial<
+      Pick<
+        ParsedRecipe,
+        | 'title'
+        | 'servings'
+        | 'prep_time_minutes'
+        | 'cook_time_minutes'
+        | 'calories_per_serving'
+        | 'allergens'
+      >
+    >,
+  ) => {
     if (!draft) return
     setDraft({ ...draft, ...patch })
   }

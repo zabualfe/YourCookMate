@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Layout } from '../components/Layout'
-import { RecipeEditor, cloneRecipe, normalizeRecipe } from '../components/RecipeEditor'
+import { RecipeEditor, cloneRecipe, normalizeRecipe, type EditorRecipe } from '../components/RecipeEditor'
 import { RecipeNutritionFields, RecipeNutritionInfo } from '../components/RecipeNutritionInfo'
 import { RecipeSourceLink } from '../components/RecipeSourceLink'
 import { createRecipeId, saveRecipe } from '../lib/storage'
@@ -18,7 +18,7 @@ export function ReviewPage() {
   const navigate = useNavigate()
   const { isAuthenticated, user } = useAuth()
   const [draft, setDraft] = useState<ReviewDraft | null>(null)
-  const [recipeDraft, setRecipeDraft] = useState<ParsedRecipe | null>(null)
+  const [recipeDraft, setRecipeDraft] = useState<EditorRecipe | null>(null)
   const [activeTab, setActiveTab] = useState<'ingredients' | 'steps'>('ingredients')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -85,7 +85,19 @@ export function ReviewPage() {
     }
   }
 
-  const updateMeta = (patch: Partial<ParsedRecipe>) => {
+  const updateMeta = (
+    patch: Partial<
+      Pick<
+        ParsedRecipe,
+        | 'title'
+        | 'servings'
+        | 'prep_time_minutes'
+        | 'cook_time_minutes'
+        | 'calories_per_serving'
+        | 'allergens'
+      >
+    >,
+  ) => {
     setRecipeDraft((current) => (current ? { ...current, ...patch } : current))
   }
 
