@@ -5,6 +5,13 @@ from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def normalize_database_url(url: str) -> str:
+    """Accept Supabase-style postgres:// URLs and normalize for SQLAlchemy."""
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://") :]
+    return url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -57,6 +64,19 @@ class Settings(BaseSettings):
     @property
     def smtp_pass(self) -> Optional[str]:
         return self.smtp_password or self.resend_api_key
+
+    @property
+    def resolved_database_url(self) -> str:
+        return normalize_database_url(self.database_url)
+
+    @property
+    def uses_sqlite(self) -> bool:
+        return self.resolved_database_url.startswith("sqlite")
+
+    @property
+    def uses_supabase(self) -> bool:
+        url = self.resolved_database_url
+        return "supabase.co" in url or "supabase.com" in url
 
 
 settings = Settings()

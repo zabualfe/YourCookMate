@@ -99,6 +99,34 @@ Without `OPENAI_API_KEY`, a heuristic fallback parser is used.
 
 See [REFERENCE.md](./REFERENCE.md) for the full product plan.
 
+## Deploy backend (Render)
+
+The API is configured via [`render.yaml`](./render.yaml) at the repo root.
+
+1. **Push** `render.yaml` and backend changes to GitHub (`main`).
+2. In [Render](https://dashboard.render.com/) → **New** → **Blueprint** → connect `YourCookMate` repo.
+3. When prompted for secret env vars, paste values from your local `backend/.env`:
+
+   | Variable | Value |
+   |----------|--------|
+   | `DATABASE_URL` | Supabase session pooler URL (port 5432) |
+   | `API_BASE_URL` | `https://yourcookmate-api.onrender.com` |
+   | `FRONTEND_URL` | Your Vercel production URL |
+   | `CORS_ORIGINS` | Same as `FRONTEND_URL` |
+   | `OPENAI_API_KEY` | From OpenAI dashboard |
+   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
+   | `GOOGLE_IOS_CLIENT_ID` | iOS OAuth client (mobile sign-in) |
+   | `RESEND_API_KEY` | From Resend |
+   | `SMTP_FROM` | Verified sender in Resend |
+
+4. After deploy, confirm **https://yourcookmate-api.onrender.com/health** returns `{"status":"ok"}`.
+5. In **Vercel** (web project), set `VITE_API_URL` to the Render URL and redeploy.
+6. In **Google Cloud Console**, add authorized origins/redirect URIs for production:
+   - Web origin: your Vercel URL
+   - API callback: `https://yourcookmate-api.onrender.com/auth/google/mobile/callback`
+
+**Note:** Render free tier spins down after ~15 min idle; first request may take ~30s. Uploaded recipe icons use ephemeral disk and reset on redeploy — use object storage later for persistence.
+
 ## iOS app
 
 Expo mobile app in [`mobile/`](./mobile/). See [mobile/README.md](./mobile/README.md).

@@ -25,7 +25,8 @@ def uploads_root() -> Path:
 def icon_public_url(icon_path: str | None) -> str | None:
     if not icon_path:
         return None
-    return f"/uploads/{icon_path.lstrip('/')}"
+    path = f"/uploads/{icon_path.lstrip('/')}"
+    return f"{settings.api_base_url.rstrip('/')}{path}"
 
 
 def _icon_file_path(icon_path: str) -> Path:

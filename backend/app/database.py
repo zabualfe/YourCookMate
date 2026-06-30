@@ -5,11 +5,19 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import settings
 
-connect_args = {}
-if settings.database_url.startswith("sqlite"):
+connect_args: dict = {}
+engine_kwargs: dict = {"pool_pre_ping": True}
+if settings.uses_sqlite:
     connect_args["check_same_thread"] = False
+elif settings.uses_supabase:
+    connect_args["sslmode"] = "require"
+    engine_kwargs["pool_recycle"] = 3600
 
-engine = create_engine(settings.database_url, pool_pre_ping=True, connect_args=connect_args)
+engine = create_engine(
+    settings.resolved_database_url,
+    connect_args=connect_args,
+    **engine_kwargs,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -35,19 +43,20 @@ def _migrate_schema() -> None:
     user_cols = {c["name"] for c in insp.get_columns("users")}
     if "email_verified" not in user_cols:
         with engine.begin() as conn:
-            if settings.database_url.startswith("sqlite"):
+            if settings.uses_sqlite:
                 conn.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 0"))
+                conn.execute(text("UPDATE users SET email_verified = 1"))
             else:
                 conn.execute(
                     text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE")
                 )
-            conn.execute(text("UPDATE users SET email_verified = 1"))
+                conn.execute(text("UPDATE users SET email_verified = TRUE"))
 
     if "recipes" in insp.get_table_names():
         recipe_cols = {c["name"] for c in insp.get_columns("recipes")}
         with engine.begin() as conn:
             if "is_public" not in recipe_cols:
-                if settings.database_url.startswith("sqlite"):
+                if settings.uses_sqlite:
                     conn.execute(text("ALTER TABLE recipes ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 0"))
                 else:
                     conn.execute(text("ALTER TABLE recipes ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE"))
