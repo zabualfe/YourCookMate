@@ -73,9 +73,7 @@ jobs:
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
-    defaults:
-      run:
-        working-directory: web
+    # Run from repo root — Vercel project Root Directory is already `web`.
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
