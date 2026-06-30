@@ -22,12 +22,19 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def _allowed_cors_origins() -> list[str]:
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    frontend = settings.frontend_url.strip().rstrip("/")
+    if frontend and frontend not in origins:
+        origins.append(frontend)
+    return origins
+
+
 app = FastAPI(title="Your Cook Mate API", version="0.3.0", lifespan=lifespan)
 
-origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=_allowed_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
