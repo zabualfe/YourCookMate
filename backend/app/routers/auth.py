@@ -31,6 +31,7 @@ from app.services.email import send_verification_email
 from app.services.oauth_apple import AppleAuthError, verify_apple_identity_token
 from app.services.oauth_google import GoogleAuthError, verify_google_id_token
 from app.services.feature_flags import require_auth_enabled, require_registration_enabled
+from app.services.verification import create_verification_token, verify_email_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -78,7 +79,10 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
 
 
 def _oauth_login(db: Session, provider: str, profile: dict) -> AuthResponse:
-    user = oauth_login(db, provider, profile)
+    try:
+        user = oauth_login(db, provider, profile)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _auth_response(user)
 
 
@@ -119,6 +123,9 @@ def apple_auth(body: OAuthTokenRequest, db: Session = Depends(get_db)) -> AuthRe
         profile = verify_apple_identity_token(body.id_token)
     except AppleAuthError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if body.display_name and not profile.get("display_name"):
+        profile["display_name"] = body.display_name.strip()
 
     return _oauth_login(db, "apple", profile)
 

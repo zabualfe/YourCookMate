@@ -18,6 +18,7 @@ class LoginRequest(BaseModel):
 
 class OAuthTokenRequest(BaseModel):
     id_token: str = Field(min_length=10)
+    display_name: Optional[str] = Field(default=None, max_length=120)
 
 
 class UserResponse(BaseModel):

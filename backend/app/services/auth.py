@@ -98,15 +98,24 @@ def oauth_login(db: Session, provider: str, profile: dict) -> User:
 
     if account:
         account.user.email_verified = True
+        if profile.get("display_name") and not account.user.display_name:
+            account.user.display_name = profile["display_name"]
         db.commit()
         db.refresh(account.user)
         return account.user
 
-    user = get_user_by_email(db, profile["email"])
+    email = profile.get("email")
+    if not email:
+        raise ValueError(
+            "Apple did not share an email. Revoke Your Cook Mate under "
+            "Settings → Apple ID → Sign in with Apple, then try again."
+        )
+
+    user = get_user_by_email(db, email)
     if user is None:
         user = create_user(
             db,
-            email=profile["email"],
+            email=email,
             display_name=profile.get("display_name"),
             avatar_url=profile.get("avatar_url"),
             email_verified=True,

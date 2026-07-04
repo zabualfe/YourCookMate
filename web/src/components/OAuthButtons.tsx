@@ -91,7 +91,11 @@ function AppleButton({ onError, redirect = '/recipes' }: OAuthButtonsProps) {
         usePopup: true,
       })
       const res = await window.AppleID!.auth.signIn()
-      const data = await loginWithApple(res.authorization.id_token)
+      const appleUser = (res as { user?: { name?: { firstName?: string; lastName?: string } } }).user
+      const displayName = appleUser?.name
+        ? [appleUser.name.firstName, appleUser.name.lastName].filter(Boolean).join(' ')
+        : undefined
+      const data = await loginWithApple(res.authorization.id_token, displayName)
       setSession(data.access_token, data.user)
       navigate(postAuthPath(data.user, redirect))
     } catch (err) {

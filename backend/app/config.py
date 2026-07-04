@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     google_client_secret: Optional[str] = None
     google_ios_client_id: Optional[str] = None
     apple_client_id: Optional[str] = None
+    # iOS native Sign in with Apple uses the app bundle ID as token audience.
+    apple_ios_client_id: Optional[str] = None
 
     frontend_url: str = "http://localhost:5173"
     api_base_url: str = "http://127.0.0.1:8000"

@@ -128,10 +128,16 @@ export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
   })
 }
 
-export async function loginWithApple(idToken: string): Promise<AuthResponse> {
+export async function loginWithApple(
+  idToken: string,
+  displayName?: string,
+): Promise<AuthResponse> {
   return request('/auth/apple', {
     method: 'POST',
-    body: JSON.stringify({ id_token: idToken }),
+    body: JSON.stringify({
+      id_token: idToken,
+      display_name: displayName || undefined,
+    }),
   })
 }
 

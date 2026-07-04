@@ -11,7 +11,9 @@ import {
   View,
 } from 'react-native'
 import { login } from '@/api/client'
-import { GoogleSignInButton, OAuthDivider } from '@/components/GoogleSignInButton'
+import { AppleSignInButton } from '@/components/AppleSignInButton'
+import { GoogleSignInButton } from '@/components/GoogleSignInButton'
+import { OAuthDivider } from '@/components/OAuthDivider'
 import { useAuth } from '@/context/AuthContext'
 import { colors } from '@/constants/theme'
 
@@ -67,6 +69,8 @@ export default function LoginScreen() {
       </Pressable>
       <OAuthDivider />
       <GoogleSignInButton onError={setError} onSuccess={() => router.back()} />
+      <View style={{ height: 12 }} />
+      <AppleSignInButton onError={setError} onSuccess={() => router.back()} />
       <Link href="/register" asChild>
         <Pressable style={styles.linkBtn}>
           <Text style={styles.linkText}>Create an account</Text>
