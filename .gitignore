@@ -14,3 +14,5 @@ backend/uploads/
 backend/cookies.txt
 backend/cookies.social.txt
 **/*cookies*.txt
+.aws-sam/
+aws/.aws-sam/

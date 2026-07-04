@@ -6,6 +6,9 @@ name: CI
 # GitHub secrets (Settings → Secrets and variables → Actions):
 #   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 #   RENDER_DEPLOY_HOOK_URL — Render → yourcookmate-api → Settings → Deploy Hook
+#   AWS_ROLE_ARN, AWS_REGION — from aws/bootstrap/github-oidc.yaml (OIDC deploy role)
+#   AWS_DATABASE_URL — Supabase pooler URL for ingest worker Lambdas (optional for stub deploy)
+#   AWS_FRONTEND_URL — Vercel production URL for API Gateway CORS (optional; default *)
 #
 # Vercel project (Root Directory = web) env vars:
 #   VITE_API_URL — production API URL
@@ -124,3 +127,54 @@ jobs:
           fi
           curl -fsS "$url"
           echo "Triggered Render deploy for ${{ github.sha }}"
+
+  deploy-aws:
+    name: Deploy to AWS (SAM)
+    needs: [backend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: production-aws
+    defaults:
+      run:
+        working-directory: aws
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify AWS deploy secrets
+        run: |
+          if [[ -z "${{ secrets.AWS_ROLE_ARN }}" || -z "${{ secrets.AWS_REGION }}" ]]; then
+            echo "::error::AWS_ROLE_ARN and AWS_REGION secrets are required. See aws/README.md"
+            exit 1
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: aws-actions/setup-sam@v2
+
+      - name: SAM validate
+        run: sam validate --lint
+
+      - name: SAM build
+        run: sam build
+
+      - name: SAM deploy
+        env:
+          DATABASE_URL: ${{ secrets.AWS_DATABASE_URL }}
+          FRONTEND_URL: ${{ secrets.AWS_FRONTEND_URL }}
+        run: |
+          params="Stage=prod"
+          if [[ -n "$DATABASE_URL" ]]; then
+            params="$params DatabaseUrl=$DATABASE_URL"
+          fi
+          if [[ -n "$FRONTEND_URL" ]]; then
+            params="$params FrontendUrl=$FRONTEND_URL"
+          fi
+          sam deploy --no-fail-on-empty-changeset --parameter-overrides "$params"

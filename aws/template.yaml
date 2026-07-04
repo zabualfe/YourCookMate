@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: YourCookMate AWS stack — API Gateway, SQS ingest pipeline, Lambda workers (Supabase + Bedrock wired next).
+
+Parameters:
+  Stage:
+    Type: String
+    Default: prod
+    AllowedPattern: "^[a-z0-9-]+$"
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Supabase Postgres URL for workers (optional until jobs table is wired).
+  BedrockParseModel:
+    Type: String
+    Default: amazon.nova-lite-v1:0
+  FrontendUrl:
+    Type: String
+    Default: "*"
+    Description: CORS allow origin (set to Vercel URL in production).
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Architectures:
+      - arm64
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowOrigins:
+          - !Ref FrontendUrl
+
+  IngestDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "yourcookmate-ingest-dlq-${Stage}"
+      MessageRetentionPeriod: 1209600
+
+  IngestQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "yourcookmate-ingest-${Stage}"
+      VisibilityTimeout: 900
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt IngestDLQ.Arn
+        maxReceiveCount: 3
+
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Health check for the AWS API surface.
+      Handler: app.handler
+      CodeUri: src/health/
+      Events:
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /health
+            Method: GET
+
+  EnqueueIngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Accept ingest requests and enqueue SQS jobs.
+      Handler: app.handler
+      CodeUri: src/enqueue_ingest/
+      Environment:
+        Variables:
+          INGEST_QUEUE_URL: !Ref IngestQueue
+          STAGE: !Ref Stage
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt IngestQueue.QueueName
+      Events:
+        IngestLink:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /ingest/link
+            Method: POST
+
+  GetJobFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Poll async job status (Supabase-backed in a later step).
+      Handler: app.handler
+      CodeUri: src/get_job/
+      Events:
+        GetJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /jobs/{job_id}
+            Method: GET
+
+  IngestWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Process ingest jobs from SQS (Bedrock Nova + Supabase next).
+      Handler: app.handler
+      CodeUri: src/ingest_worker/
+      Timeout: 900
+      MemorySize: 2048
+      Environment:
+        Variables:
+          DATABASE_URL: !Ref DatabaseUrl
+          STAGE: !Ref Stage
+          BEDROCK_PARSE_MODEL: !Ref BedrockParseModel
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt IngestQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource: "*"
+      Events:
+        IngestQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt IngestQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway HTTP API base URL
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+  IngestQueueUrl:
+    Description: SQS ingest queue URL
+    Value: !Ref IngestQueue
+  IngestQueueArn:
+    Description: SQS ingest queue ARN
+    Value: !GetAtt IngestQueue.Arn
+  IngestDLQUrl:
+    Description: SQS dead-letter queue URL
+    Value: !Ref IngestDLQ

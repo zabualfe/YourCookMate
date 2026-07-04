@@ -131,6 +131,14 @@ The API is configured via [`render.yaml`](./render.yaml) at the repo root.
 
 **Note:** Render free tier spins down after ~15 min idle; first request may take ~30s. Uploaded recipe icons use ephemeral disk and reset on redeploy — use object storage later for persistence.
 
+## Deploy AWS (API Gateway + SQS + Lambda)
+
+Async ingest runs on AWS via [SAM](https://aws.amazon.com/serverless/sam/) in [`aws/`](./aws/). GitHub Actions deploys on push to `main` after backend tests pass.
+
+**Quick setup:** follow [`aws/README.md`](./aws/README.md) — one-time OIDC bootstrap, then add GitHub secrets `AWS_ROLE_ARN`, `AWS_REGION`, and optionally `AWS_DATABASE_URL` + `AWS_FRONTEND_URL`.
+
+Render and Vercel stay live while AWS is built out in parallel.
+
 ## iOS app
 
 Expo mobile app in [`mobile/`](./mobile/). See [mobile/README.md](./mobile/README.md).
