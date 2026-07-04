@@ -24,7 +24,7 @@ from app.schemas.share import ShareRequest, ShareResponse
 from app.schemas.shop import InstacartLinkResponse
 from app.services.collections import collections_for_recipe, collections_for_recipe_ids
 from app.services.instacart import clear_instacart_cache, get_or_create_instacart_link
-from app.services.recipe_icons import delete_icon_file, icon_public_url, save_recipe_icon
+from app.services.recipe_icons import delete_icon_file, enrich_recipe_step_urls, icon_public_url, save_recipe_icon
 from app.services.share import generate_share_slug
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
@@ -37,8 +37,6 @@ def _share_url(slug: str | None) -> str | None:
 
 
 def _recipe_to_detail(row: Recipe, db: Session) -> RecipeDetailResponse:
-    from app.services.step_images import enrich_recipe_step_urls
-
     parsed = ParsedRecipe.model_validate(row.parsed_json)
     parsed = enrich_recipe_step_urls(parsed)
     return RecipeDetailResponse(
@@ -61,7 +59,8 @@ def _recipe_to_detail(row: Recipe, db: Session) -> RecipeDetailResponse:
 @router.post("/parse", response_model=ParseRecipeResponse)
 def parse_recipe_endpoint(body: ParseRecipeRequest) -> ParseRecipeResponse:
     from app.services.ai_parser import parse_recipe
-    from app.services.step_images import create_pending_step_images, enrich_recipe_step_urls
+    from app.services.step_images import create_pending_step_images
+    from app.services.recipe_icons import enrich_recipe_step_urls
     from app.services.video_cache import get_cached_frames
 
     try:

@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 
 from app.config import settings
+from app.schemas.recipe import ParsedRecipe
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,15 @@ def media_public_url(relative_path: str | None) -> str | None:
 
 def icon_public_url(icon_path: str | None) -> str | None:
     return media_public_url(icon_path)
+
+
+def enrich_recipe_step_urls(recipe: ParsedRecipe) -> ParsedRecipe:
+    for step in recipe.steps:
+        if step.image_url:
+            step.image_url = media_public_url(step.image_url)
+        if step.clip_url:
+            step.clip_url = media_public_url(step.clip_url)
+    return recipe
 
 
 def _icon_file_path(icon_path: str) -> Path:

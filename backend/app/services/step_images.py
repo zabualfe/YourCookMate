@@ -12,7 +12,6 @@ from openai import OpenAI
 from app.config import settings
 from app.schemas.recipe import ParsedRecipe, RecipeStep
 from app.services.recipe_icons import media_public_url, uploads_root
-from app.services.social_ingest import _ytdlp_options
 from app.services.video_cache import (
     ensure_video_cached,
     get_cached_duration,
@@ -35,19 +34,11 @@ Return ONLY valid JSON:
 Every step must appear exactly once. Frame numbers are 1-indexed."""
 
 
-def public_upload_url(relative_path: str | None) -> str | None:
-    if not relative_path:
-        return None
-    return media_public_url(relative_path)
-
-
 def enrich_recipe_step_urls(recipe: ParsedRecipe) -> ParsedRecipe:
-    for step in recipe.steps:
-        if step.image_url:
-            step.image_url = public_upload_url(step.image_url)
-        if step.clip_url:
-            step.clip_url = public_upload_url(step.clip_url)
-    return recipe
+    """Re-export for callers that already import from step_images (parse/create flows)."""
+    from app.services.recipe_icons import enrich_recipe_step_urls as _enrich
+
+    return _enrich(recipe)
 
 
 def _temporal_frame_indices(frame_count: int, step_count: int) -> list[int]:
@@ -217,9 +208,13 @@ def attach_step_images(
     *,
     storage_dir: str,
     duration: Optional[float] = None,
-    ytdlp_options: Callable[..., dict] = _ytdlp_options,
+    ytdlp_options: Callable[..., dict] | None = None,
 ) -> tuple[ParsedRecipe, list[str]]:
     """Pick reference frames and short clips per step, reusing cached video when available."""
+    if ytdlp_options is None:
+        from app.services.social_ingest import _ytdlp_options
+
+        ytdlp_options = _ytdlp_options
     cached_frames = get_cached_frames(source_url)
     video_path = get_cached_video(source_url)
     video_duration = _resolve_video_duration(source_url, video_path, duration)

@@ -38,7 +38,7 @@ def _get_public_recipe(db: Session, slug: str) -> Recipe:
 
 @router.get("/{slug}", response_model=SharedRecipeResponse)
 def get_shared_recipe(slug: str, db: Session = Depends(get_db)) -> SharedRecipeResponse:
-    from app.services.step_images import enrich_recipe_step_urls
+    from app.services.recipe_icons import enrich_recipe_step_urls
 
     row = _get_public_recipe(db, slug)
     parsed = ParsedRecipe.model_validate(row.parsed_json)
@@ -73,7 +73,8 @@ def save_shared_recipe(
     db: Session = Depends(get_db),
     user: User = Depends(require_verified_email),
 ) -> RecipeDetailResponse:
-    from app.services.step_images import copy_step_images, enrich_recipe_step_urls
+    from app.services.recipe_icons import enrich_recipe_step_urls
+    from app.services.step_images import copy_step_images
 
     source = _get_public_recipe(db, slug)
     if source.user_id == user.id:
