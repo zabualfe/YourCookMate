@@ -9,7 +9,7 @@ name: CI
 #   AWS_ROLE_ARN, AWS_REGION — from aws/bootstrap/github-oidc.yaml (OIDC deploy role)
 #   AWS_DATABASE_URL — Supabase pooler URL
 #   AWS_FRONTEND_URL — Vercel URL for CORS
-#   AWS_YTDLP_COOKIES — Netscape cookies for Instagram/Facebook (same as Render YTDLP_COOKIES)
+#   AWS_YTDLP_COOKIES_B64 — base64 of backend/cookies.social.txt (run ./aws/bootstrap/encode-cookies.sh)
 #
 # Vercel project env vars:
 #   VITE_API_URL — Render API (auth, recipes, parse)
@@ -206,7 +206,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.AWS_DATABASE_URL }}
           FRONTEND_URL: ${{ secrets.AWS_FRONTEND_URL }}
-          YTDLP_COOKIES: ${{ secrets.AWS_YTDLP_COOKIES }}
+          YTDLP_COOKIES_B64: ${{ secrets.AWS_YTDLP_COOKIES_B64 }}
         run: |
           overrides=( "Stage=prod" )
           if [[ -n "${FRONTEND_URL:-}" ]]; then
@@ -217,10 +217,10 @@ jobs:
           if [[ -n "${DATABASE_URL:-}" ]]; then
             overrides+=( "DatabaseUrl=${DATABASE_URL}" )
           fi
-          if [[ -n "${YTDLP_COOKIES:-}" ]]; then
-            overrides+=( "YtdlpCookies=${YTDLP_COOKIES}" )
+          if [[ -n "${YTDLP_COOKIES_B64:-}" ]]; then
+            overrides+=( "YtdlpCookiesB64=${YTDLP_COOKIES_B64}" )
           fi
-          echo "Deploying: Stage, FrontendUrl${DATABASE_URL:+, DatabaseUrl}${YTDLP_COOKIES:+, YtdlpCookies}"
+          echo "Deploying: Stage, FrontendUrl${DATABASE_URL:+, DatabaseUrl}${YTDLP_COOKIES_B64:+, YtdlpCookiesB64}"
           sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"
 
       - name: Print CloudFormation errors on failure

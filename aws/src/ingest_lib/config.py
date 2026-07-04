@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 
 
@@ -10,8 +12,19 @@ def env_bool(name: str, default: bool = True) -> bool:
     return raw.strip().lower() in {"1", "true", "yes"}
 
 
+def _load_ytdlp_cookies() -> str | None:
+    b64 = (os.environ.get("YTDLP_COOKIES_B64") or "").strip()
+    if b64:
+        try:
+            return base64.b64decode(b64).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError):
+            pass
+    raw = (os.environ.get("YTDLP_COOKIES") or "").strip()
+    return raw or None
+
+
 class Settings:
-    ytdlp_cookies: str | None = os.environ.get("YTDLP_COOKIES") or None
+    ytdlp_cookies: str | None = _load_ytdlp_cookies()
     bedrock_vision_model: str = os.environ.get("BEDROCK_VISION_MODEL", "amazon.nova-lite-v1:0")
     aws_region: str = os.environ.get("AWS_REGION", "us-east-1")
     ingest_temp_bucket: str | None = os.environ.get("INGEST_TEMP_BUCKET") or None

@@ -128,7 +128,7 @@ Import from link → AWS API → SQS → Worker Lambda
 |--------|--------|
 | `AWS_DATABASE_URL` | Supabase pooler URL |
 | `AWS_FRONTEND_URL` | Vercel URL |
-| `AWS_YTDLP_COOKIES` | Same Netscape cookies as Render `YTDLP_COOKIES` (Instagram) |
+| `AWS_YTDLP_COOKIES_B64` | Run `./aws/bootstrap/encode-cookies.sh` on `backend/cookies.social.txt` |
 
 Enable **Amazon Nova Lite** in Bedrock model access.
 

@@ -11,11 +11,11 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ""
-  YtdlpCookies:
+  YtdlpCookiesB64:
     Type: String
     NoEcho: true
     Default: ""
-    Description: Netscape-format cookies for Instagram/Facebook (same as Render YTDLP_COOKIES).
+    Description: Base64-encoded Netscape cookie file (Instagram/Facebook). Use encode-cookies.sh.
   BedrockVisionModel:
     Type: String
     Default: amazon.nova-lite-v1:0
@@ -142,7 +142,7 @@ Resources:
       Environment:
         Variables:
           DATABASE_URL: !Ref DatabaseUrl
-          YTDLP_COOKIES: !Ref YtdlpCookies
+          YTDLP_COOKIES_B64: !Ref YtdlpCookiesB64
           INGEST_TEMP_BUCKET: !Ref IngestTempBucket
           BEDROCK_VISION_MODEL: !Ref BedrockVisionModel
           FEATURE_AI_ENABLED: "true"
