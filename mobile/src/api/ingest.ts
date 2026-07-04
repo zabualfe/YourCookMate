@@ -21,7 +21,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function awsIngestRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function awsApiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!AWS_INGEST_BASE) {
     throw new Error('EXPO_PUBLIC_AWS_API_URL is not configured')
   }
@@ -38,7 +38,7 @@ async function awsIngestRequest<T>(path: string, options: RequestInit = {}): Pro
     const message =
       typeof detail === 'string'
         ? detail
-        : `AWS ingest request failed (${res.status})`
+        : `AWS request failed (${res.status})`
     throw new Error(message)
   }
   return res.json() as Promise<T>
@@ -46,7 +46,7 @@ async function awsIngestRequest<T>(path: string, options: RequestInit = {}): Pro
 
 async function pollIngestJob(jobId: string): Promise<IngestLinkResponse> {
   for (let attempt = 0; attempt < JOB_MAX_ATTEMPTS; attempt += 1) {
-    const job = await awsIngestRequest<IngestJobStatus>(`/jobs/${jobId}`)
+    const job = await awsApiRequest<IngestJobStatus>(`/jobs/${jobId}`)
     if (job.status === 'completed' && job.result) {
       return job.result
     }
@@ -71,7 +71,7 @@ export async function ingestSocialLink(payload: {
     return ingestSocialLinkSync(payload)
   }
 
-  const queued = await awsIngestRequest<IngestJobQueued>('/ingest/link', {
+  const queued = await awsApiRequest<IngestJobQueued>('/ingest/link', {
     method: 'POST',
     body: JSON.stringify({
       url: payload.url,
@@ -79,4 +79,19 @@ export async function ingestSocialLink(payload: {
     }),
   })
   return pollIngestJob(queued.job_id)
+}
+
+export async function parseRecipeViaAws(payload: {
+  raw_text: string
+  source_url?: string
+  video_duration?: number | null
+}): Promise<import('@/types/recipe').ParseRecipeResponse> {
+  return awsApiRequest('/recipes/parse', {
+    method: 'POST',
+    body: JSON.stringify({
+      raw_text: payload.raw_text,
+      source_url: payload.source_url,
+      video_duration: payload.video_duration ?? undefined,
+    }),
+  })
 }

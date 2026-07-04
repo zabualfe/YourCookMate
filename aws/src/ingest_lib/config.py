@@ -26,6 +26,10 @@ def _load_ytdlp_cookies() -> str | None:
 class Settings:
     ytdlp_cookies: str | None = _load_ytdlp_cookies()
     bedrock_vision_model: str = os.environ.get("BEDROCK_VISION_MODEL", "amazon.nova-lite-v1:0")
+    bedrock_parse_model: str = os.environ.get(
+        "BEDROCK_PARSE_MODEL",
+        os.environ.get("BEDROCK_VISION_MODEL", "amazon.nova-lite-v1:0"),
+    )
     aws_region: str = os.environ.get("AWS_REGION", "us-east-1")
     ingest_temp_bucket: str | None = os.environ.get("INGEST_TEMP_BUCKET") or None
     social_vision_max_frames: int = int(os.environ.get("SOCIAL_VISION_MAX_FRAMES", "8"))

@@ -64,6 +64,12 @@ export async function parseRecipe(
           source_url: payload.source_url,
           video_duration: payload.video_duration ?? undefined,
         }
+
+  const { getAwsIngestBase, parseRecipeViaAws } = await import('./ingest')
+  if (getAwsIngestBase()) {
+    return parseRecipeViaAws(body)
+  }
+
   return request('/recipes/parse', {
     method: 'POST',
     body: JSON.stringify(body),

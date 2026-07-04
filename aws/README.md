@@ -6,11 +6,12 @@ API Gateway + SQS + Lambda for async ingest. Supabase stays the database; Bedroc
 
 | Resource | Purpose |
 |----------|---------|
-| HTTP API | `GET /health`, `POST /ingest/link`, `GET /jobs/{job_id}` |
+| HTTP API | `GET /health`, `POST /ingest/link`, `GET /jobs/{job_id}`, `POST /recipes/parse` |
 | SQS `yourcookmate-ingest-prod` | Ingest job queue |
 | SQS DLQ | Failed jobs after 3 retries |
 | `enqueue-ingest` Lambda | Validates request → SQS message → `202` + `job_id` |
-| `ingest-worker` Lambda | SQS consumer (stub today; Nova + Supabase next) |
+| `parse-recipe` Lambda | Bedrock Nova — breaks raw text into structured steps |
+| `ingest-worker` Lambda | SQS consumer — yt-dlp, Bedrock vision, Transcribe |
 
 Render + Vercel keep running in parallel until the AWS API is fully wired.
 

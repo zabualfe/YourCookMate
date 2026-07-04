@@ -119,6 +119,12 @@ export async function parseRecipe(
           source_url: payload.source_url,
           video_duration: payload.video_duration ?? undefined,
         }
+
+  const { ingestUsesAws, parseRecipeViaAws } = await import('./ingest')
+  if (ingestUsesAws()) {
+    return parseRecipeViaAws(body)
+  }
+
   return request('/recipes/parse', {
     method: 'POST',
     body: JSON.stringify(body),

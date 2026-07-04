@@ -19,6 +19,9 @@ Parameters:
   BedrockVisionModel:
     Type: String
     Default: amazon.nova-lite-v1:0
+  BedrockParseModel:
+    Type: String
+    Default: amazon.nova-lite-v1:0
   FrontendUrl:
     Type: String
     Default: "*"
@@ -127,6 +130,35 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /jobs/{job_id}
             Method: GET
+
+  ParseRecipeFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      Description: Recipe parse — Bedrock Nova breaks text into steps.
+      Handler: parse_recipe.app.handler
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          BEDROCK_PARSE_MODEL: !Ref BedrockParseModel
+          FEATURE_AI_ENABLED: "true"
+          STAGE: !Ref Stage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:Converse
+              Resource: "*"
+      Events:
+        ParseRecipe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /recipes/parse
+            Method: POST
 
   IngestWorkerFunction:
     Type: AWS::Serverless::Function
