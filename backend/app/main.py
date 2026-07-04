@@ -26,10 +26,29 @@ async def lifespan(app: FastAPI):
 
 
 def _allowed_cors_origins() -> list[str]:
-    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    origins: list[str] = []
+    seen: set[str] = set()
+
+    def add(origin: str) -> None:
+        cleaned = origin.strip().rstrip("/")
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            origins.append(cleaned)
+
+    for part in settings.cors_origins.split(","):
+        add(part)
+
     frontend = settings.frontend_url.strip().rstrip("/")
-    if frontend and frontend not in origins:
-        origins.append(frontend)
+    add(frontend)
+
+    # Apex ↔ www (e.g. yourcookmate.com and www.yourcookmate.com)
+    if frontend.startswith("https://www."):
+        add("https://" + frontend.removeprefix("https://www."))
+    elif frontend.startswith("https://") and frontend.count(".") >= 1:
+        host = frontend.removeprefix("https://")
+        if not host.startswith("www."):
+            add(f"https://www.{host}")
+
     return origins
 
 
