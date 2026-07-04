@@ -205,14 +205,17 @@ jobs:
           DATABASE_URL: ${{ secrets.AWS_DATABASE_URL }}
           FRONTEND_URL: ${{ secrets.AWS_FRONTEND_URL }}
         run: |
-          jq -n \
-            --arg stage "prod" \
-            --arg db "${DATABASE_URL:-}" \
-            --arg front "${FRONTEND_URL:-*}" \
-            'if $db == "" then {Stage: $stage, FrontendUrl: $front} else {Stage: $stage, DatabaseUrl: $db, FrontendUrl: $front} end' \
-            > sam-params.json
-          echo "Parameter keys:" && jq 'keys' sam-params.json
-          sam deploy --no-fail-on-empty-changeset --parameter-overrides file://sam-params.json
+          overrides=( "Stage=prod" )
+          if [[ -n "${FRONTEND_URL:-}" ]]; then
+            overrides+=( "FrontendUrl=${FRONTEND_URL}" )
+          else
+            overrides+=( "FrontendUrl=*" )
+          fi
+          if [[ -n "${DATABASE_URL:-}" ]]; then
+            overrides+=( "DatabaseUrl=${DATABASE_URL}" )
+          fi
+          echo "Deploying with parameters: Stage, FrontendUrl${DATABASE_URL:+, DatabaseUrl}"
+          sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"
 
       - name: Print CloudFormation errors on failure
         if: failure()
