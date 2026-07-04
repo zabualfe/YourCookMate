@@ -163,6 +163,8 @@ Resources:
                   - s3:PutEncryptionConfiguration
                   - s3:PutLifecycleConfiguration
                   - s3:GetEncryptionConfiguration
+                  - s3:TagResource
+                  - s3:UntagResource
                 Resource: "*"
 
 Outputs:
