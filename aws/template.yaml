@@ -47,13 +47,11 @@ Resources:
   IngestDLQ:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub "yourcookmate-ingest-dlq-${Stage}"
       MessageRetentionPeriod: 1209600
 
   IngestQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub "yourcookmate-ingest-${Stage}"
       VisibilityTimeout: 900
       ReceiveMessageWaitTimeSeconds: 20
       RedrivePolicy:

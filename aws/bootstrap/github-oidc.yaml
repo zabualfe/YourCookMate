@@ -60,6 +60,7 @@ Resources:
                   - cloudformation:DescribeStacks
                   - cloudformation:DescribeStackEvents
                   - cloudformation:DescribeStackResources
+                  - cloudformation:DescribeStackResource
                   - cloudformation:GetTemplate
                   - cloudformation:ValidateTemplate
                   - cloudformation:CreateChangeSet
@@ -67,6 +68,7 @@ Resources:
                   - cloudformation:ExecuteChangeSet
                   - cloudformation:DeleteChangeSet
                   - cloudformation:ListStackResources
+                  - cloudformation:ContinueUpdateRollback
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -81,6 +83,13 @@ Resources:
                   - iam:GetRolePolicy
                   - iam:TagRole
                   - iam:UntagRole
+                  - iam:CreatePolicy
+                  - iam:DeletePolicy
+                  - iam:GetPolicy
+                  - iam:GetPolicyVersion
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListPolicyVersions
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -103,6 +112,7 @@ Resources:
                   - lambda:DeleteEventSourceMapping
                   - lambda:GetEventSourceMapping
                   - lambda:UpdateEventSourceMapping
+                  - lambda:ListVersionsByFunction
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -111,6 +121,10 @@ Resources:
                   - logs:PutLogEvents
                   - logs:DescribeLogGroups
                   - logs:DeleteLogGroup
+                  - logs:PutRetentionPolicy
+                  - logs:TagLogGroup
+                  - logs:UntagLogGroup
+                  - logs:ListTagsForResource
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -121,6 +135,7 @@ Resources:
                   - sqs:TagQueue
                   - sqs:UntagQueue
                   - sqs:GetQueueUrl
+                  - sqs:ListQueueTags
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -129,10 +144,13 @@ Resources:
                   - apigateway:PUT
                   - apigateway:PATCH
                   - apigateway:DELETE
+                  - apigateway:TagResource
+                  - apigateway:UntagResource
                 Resource: "*"
               - Effect: Allow
                 Action:
                   - s3:CreateBucket
+                  - s3:DeleteBucket
                   - s3:GetObject
                   - s3:PutObject
                   - s3:DeleteObject
@@ -140,6 +158,11 @@ Resources:
                   - s3:GetBucketLocation
                   - s3:PutBucketPolicy
                   - s3:GetBucketPolicy
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:PutBucketVersioning
+                  - s3:PutEncryptionConfiguration
+                  - s3:PutLifecycleConfiguration
+                  - s3:GetEncryptionConfiguration
                 Resource: "*"
 
 Outputs:
