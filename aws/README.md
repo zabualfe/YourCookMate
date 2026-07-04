@@ -64,22 +64,25 @@ aws cloudformation describe-stacks \
 
 ### Troubleshooting OIDC
 
-The `deploy-aws` job uses GitHub environment **`production-aws`**. That means the OIDC token `sub` claim is:
+The `deploy-aws` job uses GitHub environment **`production-api`**. The OIDC token `sub` claim is:
 
-`repo:zabualfe/YourCookMate:environment:production-aws`
+`repo:zabualfe/YourCookMate:environment:production-api`
 
-—not `repo:...:ref:refs/heads/main`. The bootstrap template must allow **both** (already fixed in-repo).
-
-If CI fails with `Not authorized to perform sts:AssumeRoleWithWebIdentity`, re-run the bootstrap stack to update the role trust policy:
+Re-run bootstrap after changing trust rules:
 
 ```bash
-aws cloudformation deploy \
-  --stack-name yourcookmate-github-oidc \
-  --template-file aws/bootstrap/github-oidc.yaml \
-  --parameter-overrides GitHubOrg=zabualfe GitHubRepo=YourCookMate GitHubEnvironment=production-aws \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region us-east-1
+./aws/bootstrap/setup-oidc.sh
 ```
+
+If you see **`InvalidIdentityToken`**, update the GitHub OIDC provider thumbprints (GitHub rotated certs):
+
+```bash
+aws iam update-open-id-connect-provider-thumbprint \
+  --open-id-connect-provider-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):oidc-provider/token.actions.githubusercontent.com" \
+  --thumbprint-list 6938fd4d98bab03faad8791377124e47b9e575b3 1c58a3a8518e8759bf075b1264325b37bf061415
+```
+
+If you see **`AccessDenied`** on AssumeRole, the role trust policy `sub` does not match the job environment name — re-run bootstrap above.
 
 Also verify `AWS_ROLE_ARN` matches the `DeployRoleArn` output and the repo name casing is exactly `YourCookMate`.
 
