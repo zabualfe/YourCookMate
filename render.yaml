@@ -52,11 +52,11 @@ services:
       - key: SMTP_USER
         value: resend
       - key: SMTP_FROM
-        sync: false
+        value: noreply@yourcookmate.com
       - key: SMTP_USE_TLS
         value: "false"
       - key: SMTP_USE_SSL
-        value: "false"
+        value: "true"
       - key: INSTACART_ENABLED
         value: "false"
       - key: ADMIN_EMAILS

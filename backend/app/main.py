@@ -53,7 +53,11 @@ app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "smtp_configured": bool(settings.smtp_host and settings.smtp_pass),
+        "smtp_from": settings.smtp_from,
+    }
 
 
 @app.get("/features", response_model=FeaturesResponse)

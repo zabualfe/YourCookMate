@@ -4,6 +4,11 @@ const DEV_VERIFY_KEY = 'yourcookmate_dev_verify_url'
 
 export function storeDevVerifyUrl(url?: string | null) {
   if (url) sessionStorage.setItem(DEV_VERIFY_KEY, url)
+  else sessionStorage.removeItem(DEV_VERIFY_KEY)
+}
+
+export function clearDevVerifyUrl() {
+  sessionStorage.removeItem(DEV_VERIFY_KEY)
 }
 
 export function peekDevVerifyUrl(): string | null {

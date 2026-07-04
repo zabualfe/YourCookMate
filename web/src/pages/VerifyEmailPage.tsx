@@ -15,8 +15,13 @@ export function VerifyEmailPage() {
   const [devLink, setDevLink] = useState<string | null>(null)
 
   useEffect(() => {
-    setDevLink(peekDevVerifyUrl())
-  }, [])
+    if (user?.email_verified) {
+      storeDevVerifyUrl(null)
+      setDevLink(null)
+    } else {
+      setDevLink(peekDevVerifyUrl())
+    }
+  }, [user?.email_verified])
 
   const handleResend = async () => {
     setError('')
@@ -28,6 +33,9 @@ export function VerifyEmailPage() {
       if (res.verification_url) {
         storeDevVerifyUrl(res.verification_url)
         setDevLink(res.verification_url)
+      } else {
+        storeDevVerifyUrl(null)
+        setDevLink(null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send email')
@@ -87,8 +95,7 @@ export function VerifyEmailPage() {
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-medium text-amber-950">Email couldn&apos;t be delivered</p>
             <p className="mt-1 text-sm text-amber-900">
-              Resend&apos;s free tier only sends to your Resend account email until you verify a domain.
-              Use this link instead:
+              Use this one-time link to verify your account:
             </p>
             <a
               href={devLink}
