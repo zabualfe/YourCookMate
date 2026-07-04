@@ -16,24 +16,37 @@ Render + Vercel keep running in parallel until the AWS API is fully wired.
 
 ## One-time AWS setup (OIDC for GitHub Actions)
 
-1. Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and log in.
-2. Deploy the bootstrap stack (replace your GitHub username):
+Run the setup script from the repo root (creates the GitHub OIDC provider if missing, then deploys the IAM role):
 
 ```bash
+./aws/bootstrap/setup-oidc.sh
+```
+
+Or manually:
+
+```bash
+# 1. Create GitHub OIDC provider (skip if it already exists in your account)
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faad8791377124e47b9e575b3
+
+# 2. Deploy deploy role
 aws cloudformation deploy \
   --stack-name yourcookmate-github-oidc \
   --template-file aws/bootstrap/github-oidc.yaml \
-  --parameter-overrides GitHubOrg=YOUR_GITHUB_USER GitHubRepo=YourCookMate \
+  --parameter-overrides GitHubOrg=zabualfe GitHubRepo=YourCookMate GitHubEnvironment=production-aws \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-1
 ```
 
-3. Copy outputs:
+Copy the role ARN:
 
 ```bash
 aws cloudformation describe-stacks \
   --stack-name yourcookmate-github-oidc \
-  --query "Stacks[0].Outputs" \
+  --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" \
+  --output text \
   --region us-east-1
 ```
 

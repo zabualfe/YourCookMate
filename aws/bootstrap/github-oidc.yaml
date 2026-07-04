@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  One-time bootstrap for GitHub Actions OIDC deploy role.
-  Deploy manually, then add GitHub secrets AWS_ROLE_ARN and AWS_REGION.
+  GitHub Actions OIDC deploy role for SAM. Uses the account-wide GitHub OIDC
+  provider (created by setup-oidc.sh). Re-deploy after changing trust rules.
 
 Parameters:
   GitHubOrg:
@@ -10,27 +10,16 @@ Parameters:
   GitHubRepo:
     Type: String
     Default: YourCookMate
-    Description: GitHub repository name
+    Description: GitHub repository name (case-sensitive)
   GitHubBranch:
     Type: String
     Default: main
-    Description: Branch allowed to assume the deploy role
   GitHubEnvironment:
     Type: String
     Default: production-aws
-    Description: GitHub Actions environment name used by deploy-aws job
+    Description: GitHub Actions environment used by deploy-aws
 
 Resources:
-  GitHubOidcProvider:
-    Type: AWS::IAM::OIDCProvider
-    Properties:
-      Url: https://token.actions.githubusercontent.com
-      ClientIdList:
-        - sts.amazonaws.com
-      ThumbprintList:
-        - 6938fd4d98bab03faad8791377124e47b9e575b3
-        - 1c58a3a8518e8779b077118526ab6804eb3ae9e3
-
   GitHubActionsDeployRole:
     Type: AWS::IAM::Role
     Properties:
@@ -38,17 +27,26 @@ Resources:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
+          # Branch-based token (workflows without a GitHub environment)
           - Effect: Allow
             Principal:
-              Federated: !Ref GitHubOidcProvider
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub:
-                  - !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
-                  - !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+          # Environment-based token (deploy-aws uses environment production-aws)
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
       Policies:
         - PolicyName: YourCookMateSamDeploy
           PolicyDocument:
@@ -148,6 +146,3 @@ Outputs:
   DeployRoleArn:
     Description: Add as GitHub secret AWS_ROLE_ARN
     Value: !GetAtt GitHubActionsDeployRole.Arn
-  OidcProviderArn:
-    Description: GitHub OIDC provider ARN
-    Value: !Ref GitHubOidcProvider
