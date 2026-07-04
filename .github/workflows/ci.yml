@@ -109,6 +109,18 @@ jobs:
       url: https://yourcookmate-api.onrender.com
     steps:
       - name: Trigger Render deploy
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK_URL }}?ref=${{ github.sha }}"
-          echo "Triggered Render deploy for commit ${{ github.sha }}"
+          if [[ -z "$DEPLOY_HOOK" ]]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is missing"
+            exit 1
+          fi
+          # Hook URLs already include ?key=… — use &ref=, not a second ?
+          if [[ "$DEPLOY_HOOK" == *"?"* ]]; then
+            url="${DEPLOY_HOOK}&ref=${{ github.sha }}"
+          else
+            url="${DEPLOY_HOOK}?ref=${{ github.sha }}"
+          fi
+          curl -fsS "$url"
+          echo "Triggered Render deploy for ${{ github.sha }}"
