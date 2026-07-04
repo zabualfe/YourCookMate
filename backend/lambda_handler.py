@@ -30,7 +30,12 @@ def _apply_request_base_url(event: dict) -> None:
         settings.api_base_url = f"https://{host}"
 
 
-_asgi = Mangum(app, lifespan="off")
+_stage = os.environ.get("STAGE", "prod").strip("/")
+_asgi = Mangum(
+    app,
+    lifespan="off",
+    api_gateway_base_path=f"/{_stage}" if _stage else None,
+)
 
 
 def handler(event, context):
