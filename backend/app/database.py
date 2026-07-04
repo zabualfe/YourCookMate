@@ -74,7 +74,7 @@ def _migrate_schema() -> None:
 
 
 def init_db() -> None:
-    from app.models import collection, email_verification_token, feature_flag, oauth_account, recipe, user  # noqa: F401
+    from app.models import collection, email_verification_token, feature_flag, job, oauth_account, recipe, user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _migrate_schema()

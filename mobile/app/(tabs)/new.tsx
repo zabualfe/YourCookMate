@@ -10,7 +10,8 @@ import {
   View,
 } from 'react-native'
 import { useMutation } from '@tanstack/react-query'
-import { ingestSocialLink, parseRecipe } from '@/api/client'
+import { ingestSocialLink } from '@/api/ingest'
+import { parseRecipe } from '@/api/client'
 import { saveReviewDraft } from '@/lib/reviewDraft'
 import type { IngestLinkResponse } from '@/types/ingest'
 import { videoPlatformLabel } from '@/types/ingest'

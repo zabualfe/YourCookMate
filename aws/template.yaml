@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: YourCookMate AWS stack — API Gateway, SQS ingest pipeline, Lambda workers (Supabase + Bedrock wired next).
+Description: YourCookMate AWS stack — async ingest via API Gateway, SQS, Lambda, Supabase jobs.
 
 Parameters:
   Stage:
@@ -11,14 +11,18 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ""
-    Description: Supabase Postgres URL for workers (optional until jobs table is wired).
+    Description: Supabase Postgres URL (session pooler, port 5432).
+  IngestApiUrl:
+    Type: String
+    Default: ""
+    Description: Render API base URL for ingest worker (e.g. https://yourcookmate-api.onrender.com).
   BedrockParseModel:
     Type: String
     Default: amazon.nova-lite-v1:0
   FrontendUrl:
     Type: String
     Default: "*"
-    Description: CORS allow origin (set to Vercel URL in production).
+    Description: CORS allow origin (Vercel production URL).
 
 Globals:
   Function:
@@ -27,6 +31,7 @@ Globals:
     MemorySize: 256
     Architectures:
       - arm64
+    CodeUri: src/
 
 Resources:
   HttpApi:
@@ -62,8 +67,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Description: Health check for the AWS API surface.
-      Handler: app.handler
-      CodeUri: src/health/
+      Handler: health.app.handler
       Events:
         Health:
           Type: HttpApi
@@ -75,12 +79,12 @@ Resources:
   EnqueueIngestFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: Accept ingest requests and enqueue SQS jobs.
-      Handler: app.handler
-      CodeUri: src/enqueue_ingest/
+      Description: Queue social ingest jobs (Supabase jobs + SQS).
+      Handler: enqueue_ingest.app.handler
       Environment:
         Variables:
           INGEST_QUEUE_URL: !Ref IngestQueue
+          DATABASE_URL: !Ref DatabaseUrl
           STAGE: !Ref Stage
       Policies:
         - SQSSendMessagePolicy:
@@ -96,9 +100,12 @@ Resources:
   GetJobFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: Poll async job status (Supabase-backed in a later step).
-      Handler: app.handler
-      CodeUri: src/get_job/
+      Description: Poll async ingest job status from Supabase.
+      Handler: get_job.app.handler
+      Environment:
+        Variables:
+          DATABASE_URL: !Ref DatabaseUrl
+          STAGE: !Ref Stage
       Events:
         GetJob:
           Type: HttpApi
@@ -110,25 +117,20 @@ Resources:
   IngestWorkerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: Process ingest jobs from SQS (Bedrock Nova + Supabase next).
-      Handler: app.handler
-      CodeUri: src/ingest_worker/
+      Description: Run ingest via Render API; store result in Supabase jobs table.
+      Handler: ingest_worker.app.handler
       Timeout: 900
-      MemorySize: 2048
+      MemorySize: 512
       Environment:
         Variables:
           DATABASE_URL: !Ref DatabaseUrl
+          INGEST_API_URL: !Ref IngestApiUrl
+          INGEST_TIMEOUT_SECONDS: "600"
           STAGE: !Ref Stage
           BEDROCK_PARSE_MODEL: !Ref BedrockParseModel
       Policies:
         - SQSPollerPolicy:
             QueueName: !GetAtt IngestQueue.QueueName
-        - Statement:
-            - Effect: Allow
-              Action:
-                - bedrock:InvokeModel
-                - bedrock:InvokeModelWithResponseStream
-              Resource: "*"
       Events:
         IngestQueueEvent:
           Type: SQS
@@ -140,7 +142,7 @@ Resources:
 
 Outputs:
   ApiEndpoint:
-    Description: API Gateway HTTP API base URL
+    Description: Set VITE_AWS_API_URL / EXPO_PUBLIC_AWS_API_URL to this value + stage path
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
   IngestQueueUrl:
     Description: SQS ingest queue URL

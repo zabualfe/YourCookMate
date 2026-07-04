@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 
 import boto3
 
+from shared.jobs_db import create_job
+
 sqs = boto3.client("sqs")
 QUEUE_URL = os.environ["INGEST_QUEUE_URL"]
 
@@ -50,21 +52,21 @@ def handler(event, context):
     if isinstance(caption, str) and len(caption) > 50000:
         return _response(422, {"detail": "caption is too long"})
 
-    job_id = str(uuid.uuid4())
+    job_id = uuid.uuid4()
     message = {
-        "job_id": job_id,
+        "job_id": str(job_id),
         "type": "ingest_link",
         "payload": {"url": url.strip(), "caption": caption},
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
+    create_job(job_id, "ingest_link", message["payload"])
     sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(message))
 
     return _response(
         202,
         {
-            "job_id": job_id,
+            "job_id": str(job_id),
             "status": "queued",
-            "message": "Ingest job queued. Poll GET /jobs/{job_id} for status.",
         },
     )

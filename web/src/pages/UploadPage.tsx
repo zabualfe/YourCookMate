@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { useFeatures } from '../context/FeaturesContext'
-import { ingestSocialLink, parseRecipe } from '../api/client'
+import { ingestSocialLink, ingestUsesAws } from '../api/ingest'
+import { parseRecipe } from '../api/client'
 import type { IngestLinkResponse } from '../types/ingest'
 import { videoPlatformLabel } from '../types/ingest'
 
@@ -182,7 +183,11 @@ export function UploadPage() {
               onClick={() => ingestMutation.mutate()}
               className="rounded-xl border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-800 transition enabled:hover:bg-stone-50 disabled:opacity-50"
             >
-              {ingestMutation.isPending ? 'Importing (may take a minute)…' : 'Import from link'}
+              {ingestMutation.isPending
+                ? ingestUsesAws()
+                  ? 'Importing via AWS (may take a minute)…'
+                  : 'Importing (may take a minute)…'
+                : 'Import from link'}
             </button>
 
             {ingestMutation.isError && (

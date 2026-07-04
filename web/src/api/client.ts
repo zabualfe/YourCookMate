@@ -74,6 +74,15 @@ export async function ingestSocialLink(payload: {
   url: string
   caption?: string
 }): Promise<IngestLinkResponse> {
+  const { ingestSocialLink: ingestViaAws } = await import('./ingest')
+  return ingestViaAws(payload)
+}
+
+/** Direct Render sync ingest (used when VITE_AWS_API_URL is unset). */
+export async function ingestSocialLinkSync(payload: {
+  url: string
+  caption?: string
+}): Promise<IngestLinkResponse> {
   return request('/ingest/link', {
     method: 'POST',
     body: JSON.stringify({

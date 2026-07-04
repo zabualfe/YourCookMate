@@ -107,6 +107,42 @@ sam deploy --guided
 
 First run creates an S3 bucket for deployment artifacts automatically (`resolve_s3 = true`).
 
+## Wired ingest flow (production)
+
+When `VITE_AWS_API_URL` (web) or `EXPO_PUBLIC_AWS_API_URL` (mobile) is set:
+
+```
+Import from link
+  → POST {AWS}/ingest/link  (202 + job_id)
+  → SQS → worker Lambda
+  → POST {Render}/ingest/link  (actual yt-dlp / OpenAI processing today)
+  → job result saved in Supabase `jobs` table
+  → client polls GET {AWS}/jobs/{job_id}
+  → extracted text shown in UI
+```
+
+Parse recipe still uses Render (`VITE_API_URL` → `/recipes/parse`).
+
+### Vercel env vars
+
+| Variable | Example |
+|----------|---------|
+| `VITE_API_URL` | `https://yourcookmate-api.onrender.com` |
+| `VITE_AWS_API_URL` | `https://xxx.execute-api.us-east-1.amazonaws.com/prod` |
+
+### GitHub secret (SAM deploy)
+
+| Secret | Value |
+|--------|--------|
+| `AWS_INGEST_API_URL` | `https://yourcookmate-api.onrender.com` |
+
+Get AWS URL after deploy:
+
+```bash
+aws cloudformation describe-stacks --stack-name yourcookmate \
+  --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" --output text
+```
+
 ## Test the deployed API
 
 ```bash
