@@ -103,7 +103,8 @@ def transcribe_audio_file(audio_path: Path) -> Optional[str]:
             LanguageCode="en-US",
         )
 
-        for _ in range(120):
+        poll_interval = 0.75
+        for attempt in range(120):
             job = transcribe.get_transcription_job(TranscriptionJobName=job_name)
             status = job["TranscriptionJob"]["TranscriptionJobStatus"]
             if status == "COMPLETED":
@@ -118,7 +119,7 @@ def transcribe_audio_file(audio_path: Path) -> Optional[str]:
                 return text if len(text) >= 12 else None
             if status == "FAILED":
                 return None
-            time.sleep(2)
+            time.sleep(poll_interval if attempt < 8 else 1.5)
     except Exception:
         return None
     finally:

@@ -15,6 +15,7 @@ import { parseRecipe } from '@/api/client'
 import { saveReviewDraft } from '@/lib/reviewDraft'
 import type { IngestLinkResponse } from '@/types/ingest'
 import { videoPlatformLabel } from '@/types/ingest'
+import { VideoLinkPreview } from '@/components/VideoLinkPreview'
 import { colors } from '@/constants/theme'
 
 type Tab = 'text' | 'link'
@@ -106,6 +107,7 @@ export default function NewRecipeScreen() {
             autoCapitalize="none"
             style={styles.input}
           />
+          {linkUrl.trim().length >= 10 && <VideoLinkPreview url={linkUrl} />}
           <Text style={[styles.label, { marginTop: 12 }]}>Caption (optional)</Text>
           <TextInput
             value={manualCaption}

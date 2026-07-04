@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -258,24 +259,44 @@ def _needs_enrichment(merged: str, transcript: Optional[str]) -> bool:
     return False
 
 
-def _should_run_audio(source_type: str, merged: str, transcript: Optional[str]) -> bool:
+def _should_run_audio(
+    source_type: str,
+    merged: str,
+    transcript: Optional[str],
+    subtitle: Optional[str] = None,
+) -> bool:
     if transcript is not None:
         return False
-    if source_type in SHORT_FORM_PLATFORMS:
-        return True
+    if subtitle and len(subtitle.strip()) >= 20:
+        return False
     return _needs_enrichment(merged, None)
 
 
-def _should_run_visual(source_type: str, merged: str, transcript: Optional[str]) -> bool:
-    if source_type in SHORT_FORM_PLATFORMS:
-        return True
-    return _needs_enrichment(merged, transcript)
+def _should_run_visual(
+    source_type: str,
+    merged: str,
+    transcript: Optional[str],
+    subtitle: Optional[str] = None,
+) -> bool:
+    effective_transcript = transcript
+    if not effective_transcript and subtitle and len(subtitle.strip()) >= 20:
+        effective_transcript = subtitle
+    return _needs_enrichment(merged, effective_transcript)
 
 
-def _needs_video_processing(source_type: str, merged: str, transcript: Optional[str]) -> bool:
-    return _should_run_audio(source_type, merged, transcript) or _should_run_visual(
-        source_type, merged, transcript
+def _needs_video_processing(
+    source_type: str,
+    merged: str,
+    transcript: Optional[str],
+    subtitle: Optional[str] = None,
+) -> bool:
+    return _should_run_audio(source_type, merged, transcript, subtitle) or _should_run_visual(
+        source_type, merged, transcript, subtitle
     )
+
+
+def _ingest_frame_count() -> int:
+    return max(1, settings.social_vision_max_frames)
 
 
 def _run_audio_step(
@@ -283,12 +304,13 @@ def _run_audio_step(
     notes: list[str],
     *,
     video_path: Optional[Path] = None,
+    max_audio_seconds: Optional[float] = None,
 ) -> Optional[str]:
     notes.append("Trying audio transcription (Amazon Transcribe)…")
     if video_path and video_path.is_file():
         with tempfile.TemporaryDirectory() as tmp:
             audio_path = Path(tmp) / "audio.m4a"
-            if not extract_audio_from_video(video_path, audio_path):
+            if not extract_audio_from_video(video_path, audio_path, max_seconds=max_audio_seconds):
                 notes.append("Could not extract audio from video.")
                 return None
             transcript = transcribe_audio_file(audio_path)
@@ -314,7 +336,7 @@ def _run_visual_step(source_url: str, notes: list[str], duration: Optional[float
             source_url,
             _ytdlp_options,
             duration=duration,
-            frame_count=settings.social_step_max_frames,
+            frame_count=_ingest_frame_count(),
         )
         frames = get_cached_frames(source_url)
     visual_text = analyze_frames_for_recipe(frames) if frames else None
@@ -373,11 +395,15 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
     if subtitle_text:
         notes.append("Added on-screen captions from the video.")
 
-    transcript: Optional[str] = None
-    visual_text: Optional[str] = None
     merged = _merge_text_parts(title, description, subtitle_text, None, None)
 
-    if _needs_video_processing(source_type, merged, None):
+    need_audio = _should_run_audio(source_type, merged, None, subtitle_text)
+    need_visual = _should_run_visual(source_type, merged, None, subtitle_text)
+    need_video = need_audio or need_visual
+
+    if not need_video:
+        notes.append("Caption looks complete — skipped video download and AI enrichment.")
+    elif need_video:
         if get_cached_video(source_url):
             notes.append("Using cached video from this import session.")
         else:
@@ -386,19 +412,40 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
             source_url,
             _ytdlp_options,
             duration=duration,
-            frame_count=settings.social_step_max_frames,
+            frame_count=_ingest_frame_count(),
         )
 
     cached_video = get_cached_video(source_url)
+    transcript: Optional[str] = None
+    visual_text: Optional[str] = None
+    max_audio = 90.0 if source_type in SHORT_FORM_PLATFORMS else None
 
-    if _should_run_audio(source_type, merged, None):
+    if need_audio and need_visual:
+        audio_notes: list[str] = []
+        visual_notes: list[str] = []
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            audio_future = pool.submit(
+                _run_audio_step,
+                source_url,
+                audio_notes,
+                video_path=cached_video,
+                max_audio_seconds=max_audio,
+            )
+            visual_future = pool.submit(_run_visual_step, source_url, visual_notes, duration)
+            transcript = audio_future.result()
+            visual_text = visual_future.result()
+        notes.extend(audio_notes)
+        notes.extend(visual_notes)
+    elif need_audio:
         if not subtitle_text and not description:
             notes.append("Caption looks incomplete — trying audio transcription…")
-        transcript = _run_audio_step(source_url, notes, video_path=cached_video)
-
-    merged = _merge_text_parts(title, description, subtitle_text, transcript, None)
-
-    if _should_run_visual(source_type, merged, transcript):
+        transcript = _run_audio_step(
+            source_url,
+            notes,
+            video_path=cached_video,
+            max_audio_seconds=max_audio,
+        )
+    elif need_visual:
         visual_text = _run_visual_step(source_url, notes, duration)
 
     raw_text = _merge_text_parts(title, description, subtitle_text, transcript, visual_text)

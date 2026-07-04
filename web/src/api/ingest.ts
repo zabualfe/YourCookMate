@@ -5,7 +5,8 @@ const BUILD_TIME_AWS_BASE = (import.meta.env.VITE_AWS_API_URL as string | undefi
 /** Runtime override from /api/features (Vercel env without rebuild). */
 let runtimeAwsBase: string | undefined = BUILD_TIME_AWS_BASE
 
-const JOB_POLL_MS = 2000
+const JOB_POLL_MS = 1000
+const JOB_POLL_MS_MAX = 2000
 const JOB_MAX_ATTEMPTS = 150 // ~5 minutes
 
 export interface IngestJobQueued {
@@ -70,7 +71,8 @@ async function pollIngestJob(jobId: string): Promise<IngestLinkResponse> {
     if (job.status === 'failed') {
       throw new Error(job.error || 'Import failed')
     }
-    await sleep(JOB_POLL_MS)
+    const delay = Math.min(JOB_POLL_MS + attempt * 100, JOB_POLL_MS_MAX)
+    await sleep(delay)
   }
   throw new Error('Import timed out — try again or paste the caption manually.')
 }

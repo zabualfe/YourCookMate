@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout'
 import { useFeatures } from '../context/FeaturesContext'
 import { ingestSocialLink, ingestUsesAws } from '../api/ingest'
 import { parseRecipe } from '../api/client'
+import { VideoLinkPreview } from '../components/VideoLinkPreview'
 import type { IngestLinkResponse } from '../types/ingest'
 import { videoPlatformLabel } from '../types/ingest'
 
@@ -164,6 +165,8 @@ export function UploadPage() {
               />
             </label>
 
+            {linkUrl.trim().length >= 10 && <VideoLinkPreview url={linkUrl} />}
+
             <label className="block">
               <span className="text-sm font-medium text-stone-700">
                 Caption <span className="font-normal text-stone-400">(optional — use if import fails)</span>
@@ -284,9 +287,8 @@ export function UploadPage() {
         )}
 
         <p className="mt-3 text-xs text-stone-400">
-          Video import reads captions, on-screen text, spoken audio (Amazon Transcribe), and
-          analyzes video frames with Bedrock Nova on AWS when VITE_AWS_API_URL is set.
-          Instagram/Facebook may need YTDLP_COOKIES on the ingest worker. Recipe parsing still uses Render.
+          Video import reads captions, on-screen text, spoken audio, and video frames on AWS when
+          VITE_AWS_API_URL is set. Instagram/Facebook may need YTDLP_COOKIES on the ingest worker.
         </p>
       </div>
     </Layout>

@@ -79,24 +79,37 @@ def extract_evenly_spaced_frames(
     return sorted(tmp_dir.glob("frame_*.jpg"))[:count]
 
 
-def extract_audio_from_video(video_path: Path, output_path: Path) -> bool:
+def extract_audio_from_video(
+    video_path: Path,
+    output_path: Path,
+    *,
+    max_seconds: Optional[float] = None,
+) -> bool:
     ffmpeg = ffmpeg_executable()
     if not ffmpeg:
         return False
 
-    result = subprocess.run(
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(video_path),
+    ]
+    if max_seconds and max_seconds > 0:
+        cmd.extend(["-t", str(max_seconds)])
+    cmd.extend(
         [
-            ffmpeg,
-            "-y",
-            "-i",
-            str(video_path),
             "-vn",
             "-acodec",
             "aac",
             "-b:a",
             "128k",
             str(output_path),
-        ],
+        ]
+    )
+
+    result = subprocess.run(
+        cmd,
         capture_output=True,
         check=False,
     )
