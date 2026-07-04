@@ -18,7 +18,8 @@
         "cloudformation:ExecuteChangeSet",
         "cloudformation:DeleteChangeSet",
         "cloudformation:ListStackResources",
-        "cloudformation:ContinueUpdateRollback"
+        "cloudformation:ContinueUpdateRollback",
+        "cloudformation:GetTemplateSummary"
       ],
       "Resource": "*"
     },

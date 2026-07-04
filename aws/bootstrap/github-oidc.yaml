@@ -69,6 +69,7 @@ Resources:
                   - cloudformation:DeleteChangeSet
                   - cloudformation:ListStackResources
                   - cloudformation:ContinueUpdateRollback
+                  - cloudformation:GetTemplateSummary
                 Resource: "*"
               - Effect: Allow
                 Action:
