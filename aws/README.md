@@ -109,32 +109,28 @@ First run creates an S3 bucket for deployment artifacts automatically (`resolve_
 
 ## Wired ingest flow (production)
 
-When `VITE_AWS_API_URL` (web) or `EXPO_PUBLIC_AWS_API_URL` (mobile) is set:
+When `VITE_AWS_API_URL` or `AWS_API_URL` is set on Vercel:
 
 ```
-Import from link
-  → POST {AWS}/ingest/link  (202 + job_id)
-  → SQS → worker Lambda
-  → POST {Render}/ingest/link  (actual yt-dlp / OpenAI processing today)
-  → job result saved in Supabase `jobs` table
-  → client polls GET {AWS}/jobs/{job_id}
-  → extracted text shown in UI
+Import from link → AWS API → SQS → Worker Lambda
+  → yt-dlp (metadata + video)
+  → Amazon Transcribe (speech)
+  → Bedrock Nova (frame vision)
+  → Supabase jobs table
+  → client polls GET /jobs/{id}
 ```
 
-Parse recipe still uses Render (`VITE_API_URL` → `/recipes/parse`).
+**No Render** for ingestion. Render still serves auth, recipes, and `/recipes/parse`.
 
-### Vercel env vars
-
-| Variable | Example |
-|----------|---------|
-| `VITE_API_URL` | `https://yourcookmate-api.onrender.com` |
-| `VITE_AWS_API_URL` | `https://xxx.execute-api.us-east-1.amazonaws.com/prod` |
-
-### GitHub secret (SAM deploy)
+### GitHub secrets (SAM deploy)
 
 | Secret | Value |
 |--------|--------|
-| `AWS_INGEST_API_URL` | `https://yourcookmate-api.onrender.com` |
+| `AWS_DATABASE_URL` | Supabase pooler URL |
+| `AWS_FRONTEND_URL` | Vercel URL |
+| `AWS_YTDLP_COOKIES` | Same Netscape cookies as Render `YTDLP_COOKIES` (Instagram) |
+
+Enable **Amazon Nova Lite** in Bedrock model access.
 
 Get AWS URL after deploy:
 

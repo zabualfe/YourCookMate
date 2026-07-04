@@ -2,41 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 from uuid import UUID
 
-import httpx
-
-from shared.jobs_db import dumps_result, get_job, update_job_status
+from ingest_lib.errors import IngestError
+from ingest_lib.social_ingest import ingest_social_link
+from shared.jobs_db import dumps_result, update_job_status
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-INGEST_API_URL = os.environ.get("INGEST_API_URL", "").strip().rstrip("/")
-INGEST_TIMEOUT_SECONDS = float(os.environ.get("INGEST_TIMEOUT_SECONDS", "600"))
-
-
-def _run_ingest(url: str, caption: str | None) -> dict[str, Any]:
-    if not INGEST_API_URL:
-        raise RuntimeError("INGEST_API_URL is not configured on the worker")
-
-    body: dict[str, Any] = {"url": url}
-    if caption:
-        body["caption"] = caption
-
-    with httpx.Client(timeout=INGEST_TIMEOUT_SECONDS) as client:
-        response = client.post(f"{INGEST_API_URL}/ingest/link", json=body)
-        if response.status_code >= 400:
-            detail = response.text
-            try:
-                payload = response.json()
-                if isinstance(payload, dict) and payload.get("detail"):
-                    detail = payload["detail"]
-            except Exception:
-                pass
-            raise RuntimeError(str(detail))
-        return response.json()
 
 
 def _process_job(message: dict[str, Any]) -> None:
@@ -48,26 +22,29 @@ def _process_job(message: dict[str, Any]) -> None:
     logger.info("processing job_id=%s url=%s", job_id, url)
     update_job_status(job_id, "processing")
 
-    try:
-        if not isinstance(url, str):
-            raise ValueError("Missing url in job payload")
-        result = _run_ingest(url, caption if isinstance(caption, str) else None)
-        update_job_status(job_id, "completed", result=dumps_result(result))
-        logger.info("job_id=%s completed", job_id)
-    except Exception as exc:
-        logger.exception("job_id=%s failed", job_id)
-        update_job_status(job_id, "failed", error=str(exc))
-        raise
+    if not isinstance(url, str):
+        raise ValueError("Missing url in job payload")
+
+    result = ingest_social_link(url, caption if isinstance(caption, str) else None)
+    update_job_status(job_id, "completed", result=dumps_result(result))
+    logger.info("job_id=%s completed", job_id)
 
 
 def handler(event, context):
     failures: list[dict[str, str]] = []
     for record in event.get("Records", []):
         body = json.loads(record["body"])
-        job_id = body.get("job_id", "unknown")
+        job_id_raw = body.get("job_id", "")
         try:
             _process_job(body)
-        except Exception:
+        except IngestError as exc:
+            logger.warning("job_id=%s ingest error: %s", job_id_raw, exc.message)
+            update_job_status(UUID(job_id_raw), "failed", error=exc.message)
+        except Exception as exc:
+            logger.exception("job_id=%s failed", job_id_raw)
+            try:
+                update_job_status(UUID(job_id_raw), "failed", error=str(exc))
+            except Exception:
+                pass
             failures.append({"itemIdentifier": record["messageId"]})
-            logger.error("job_id=%s will retry or go to DLQ", job_id)
     return {"batchItemFailures": failures}

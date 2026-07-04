@@ -7,9 +7,9 @@ name: CI
 #   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 #   RENDER_DEPLOY_HOOK_URL — Render → yourcookmate-api → Settings → Deploy Hook
 #   AWS_ROLE_ARN, AWS_REGION — from aws/bootstrap/github-oidc.yaml (OIDC deploy role)
-#   AWS_DATABASE_URL — Supabase pooler URL for ingest worker Lambdas (optional for stub deploy)
-#   AWS_FRONTEND_URL — Vercel production URL for API Gateway CORS (optional; default *)
-#   AWS_INGEST_API_URL — Render API base for worker ingest (e.g. https://yourcookmate-api.onrender.com)
+#   AWS_DATABASE_URL — Supabase pooler URL
+#   AWS_FRONTEND_URL — Vercel URL for CORS
+#   AWS_YTDLP_COOKIES — Netscape cookies for Instagram/Facebook (same as Render YTDLP_COOKIES)
 #
 # Vercel project env vars:
 #   VITE_API_URL — Render API (auth, recipes, parse)
@@ -206,7 +206,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.AWS_DATABASE_URL }}
           FRONTEND_URL: ${{ secrets.AWS_FRONTEND_URL }}
-          INGEST_API_URL: ${{ secrets.AWS_INGEST_API_URL }}
+          YTDLP_COOKIES: ${{ secrets.AWS_YTDLP_COOKIES }}
         run: |
           overrides=( "Stage=prod" )
           if [[ -n "${FRONTEND_URL:-}" ]]; then
@@ -217,10 +217,10 @@ jobs:
           if [[ -n "${DATABASE_URL:-}" ]]; then
             overrides+=( "DatabaseUrl=${DATABASE_URL}" )
           fi
-          if [[ -n "${INGEST_API_URL:-}" ]]; then
-            overrides+=( "IngestApiUrl=${INGEST_API_URL}" )
+          if [[ -n "${YTDLP_COOKIES:-}" ]]; then
+            overrides+=( "YtdlpCookies=${YTDLP_COOKIES}" )
           fi
-          echo "Deploying with parameters: Stage, FrontendUrl${DATABASE_URL:+, DatabaseUrl}${INGEST_API_URL:+, IngestApiUrl}"
+          echo "Deploying: Stage, FrontendUrl${DATABASE_URL:+, DatabaseUrl}${YTDLP_COOKIES:+, YtdlpCookies}"
           sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"
 
       - name: Print CloudFormation errors on failure

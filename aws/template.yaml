@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: YourCookMate AWS stack — async ingest via API Gateway, SQS, Lambda, Supabase jobs.
+Description: YourCookMate AWS — async ingest on Lambda (yt-dlp, Bedrock Nova, Transcribe).
 
 Parameters:
   Stage:
@@ -11,18 +11,17 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ""
-    Description: Supabase Postgres URL (session pooler, port 5432).
-  IngestApiUrl:
+  YtdlpCookies:
     Type: String
+    NoEcho: true
     Default: ""
-    Description: Render API base URL for ingest worker (e.g. https://yourcookmate-api.onrender.com).
-  BedrockParseModel:
+    Description: Netscape-format cookies for Instagram/Facebook (same as Render YTDLP_COOKIES).
+  BedrockVisionModel:
     Type: String
     Default: amazon.nova-lite-v1:0
   FrontendUrl:
     Type: String
     Default: "*"
-    Description: CORS allow origin (Vercel production URL).
 
 Globals:
   Function:
@@ -34,6 +33,20 @@ Globals:
     CodeUri: src/
 
 Resources:
+  IngestTempBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireTranscribeTemp
+            Status: Enabled
+            Prefix: transcribe/
+            ExpirationInDays: 1
+
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -66,7 +79,6 @@ Resources:
   HealthFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: Health check for the AWS API surface.
       Handler: health.app.handler
       Events:
         Health:
@@ -78,8 +90,9 @@ Resources:
 
   EnqueueIngestFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
     Properties:
-      Description: Queue social ingest jobs (Supabase jobs + SQS).
       Handler: enqueue_ingest.app.handler
       Environment:
         Variables:
@@ -99,8 +112,9 @@ Resources:
 
   GetJobFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
     Properties:
-      Description: Poll async ingest job status from Supabase.
       Handler: get_job.app.handler
       Environment:
         Variables:
@@ -116,21 +130,41 @@ Resources:
 
   IngestWorkerFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+      RequirementsFile: requirements-worker.txt
     Properties:
-      Description: Run ingest via Render API; store result in Supabase jobs table.
+      Description: Native ingest — yt-dlp, Bedrock Nova vision, Amazon Transcribe.
       Handler: ingest_worker.app.handler
       Timeout: 900
-      MemorySize: 512
+      MemorySize: 2048
+      EphemeralStorage:
+        Size: 2048
       Environment:
         Variables:
           DATABASE_URL: !Ref DatabaseUrl
-          INGEST_API_URL: !Ref IngestApiUrl
-          INGEST_TIMEOUT_SECONDS: "600"
+          YTDLP_COOKIES: !Ref YtdlpCookies
+          INGEST_TEMP_BUCKET: !Ref IngestTempBucket
+          BEDROCK_VISION_MODEL: !Ref BedrockVisionModel
+          FEATURE_AI_ENABLED: "true"
           STAGE: !Ref Stage
-          BEDROCK_PARSE_MODEL: !Ref BedrockParseModel
       Policies:
         - SQSPollerPolicy:
             QueueName: !GetAtt IngestQueue.QueueName
+        - S3CrudPolicy:
+            BucketName: !Ref IngestTempBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:Converse
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - transcribe:StartTranscriptionJob
+                - transcribe:GetTranscriptionJob
+                - transcribe:DeleteTranscriptionJob
+              Resource: "*"
       Events:
         IngestQueueEvent:
           Type: SQS
@@ -142,14 +176,8 @@ Resources:
 
 Outputs:
   ApiEndpoint:
-    Description: Set VITE_AWS_API_URL / EXPO_PUBLIC_AWS_API_URL to this value + stage path
+    Description: Set VITE_AWS_API_URL / AWS_API_URL on Vercel
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
-  IngestQueueUrl:
-    Description: SQS ingest queue URL
-    Value: !Ref IngestQueue
-  IngestQueueArn:
-    Description: SQS ingest queue ARN
-    Value: !GetAtt IngestQueue.Arn
-  IngestDLQUrl:
-    Description: SQS dead-letter queue URL
-    Value: !Ref IngestDLQ
+  IngestTempBucketName:
+    Description: S3 bucket for transient transcribe audio
+    Value: !Ref IngestTempBucket

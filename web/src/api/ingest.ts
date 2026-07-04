@@ -1,6 +1,9 @@
 import type { IngestLinkResponse } from '../types/ingest'
 
-const AWS_INGEST_BASE = (import.meta.env.VITE_AWS_API_URL as string | undefined)?.replace(/\/$/, '')
+const BUILD_TIME_AWS_BASE = (import.meta.env.VITE_AWS_API_URL as string | undefined)?.replace(/\/$/, '')
+
+/** Runtime override from /api/features (Vercel env without rebuild). */
+let runtimeAwsBase: string | undefined = BUILD_TIME_AWS_BASE
 
 const JOB_POLL_MS = 2000
 const JOB_MAX_ATTEMPTS = 150 // ~5 minutes
@@ -17,15 +20,29 @@ export interface IngestJobStatus {
   error?: string | null
 }
 
+export function configureAwsIngestBase(url: string | null | undefined): void {
+  const cleaned = url?.trim().replace(/\/$/, '')
+  runtimeAwsBase = cleaned || BUILD_TIME_AWS_BASE
+}
+
+export function getAwsIngestBase(): string | undefined {
+  return runtimeAwsBase
+}
+
+export function ingestUsesAws(): boolean {
+  return Boolean(getAwsIngestBase())
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 async function awsIngestRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!AWS_INGEST_BASE) {
-    throw new Error('VITE_AWS_API_URL is not configured')
+  const base = getAwsIngestBase()
+  if (!base) {
+    throw new Error('AWS ingest URL is not configured (set VITE_AWS_API_URL or AWS_API_URL on Vercel)')
   }
-  const res = await fetch(`${AWS_INGEST_BASE}${path}`, {
+  const res = await fetch(`${base}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -58,16 +75,12 @@ async function pollIngestJob(jobId: string): Promise<IngestLinkResponse> {
   throw new Error('Import timed out — try again or paste the caption manually.')
 }
 
-export function ingestUsesAws(): boolean {
-  return Boolean(AWS_INGEST_BASE)
-}
-
-/** Social link import — AWS async queue when VITE_AWS_API_URL is set, else Render sync. */
+/** Social link import — AWS async when aws_api_url is configured, else Render sync. */
 export async function ingestSocialLink(payload: {
   url: string
   caption?: string
 }): Promise<IngestLinkResponse> {
-  if (!AWS_INGEST_BASE) {
+  if (!getAwsIngestBase()) {
     const { ingestSocialLinkSync } = await import('./client')
     return ingestSocialLinkSync(payload)
   }

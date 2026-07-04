@@ -133,6 +133,8 @@ export interface AppFeatures {
   instacart: boolean
   instacart_shopping: boolean
   instacart_connect: boolean
+  /** Set on Vercel via VITE_AWS_API_URL or AWS_API_URL — enables async ingest through API Gateway */
+  aws_api_url?: string | null
 }
 
 export async function getFeatures(): Promise<AppFeatures> {

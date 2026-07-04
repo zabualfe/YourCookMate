@@ -70,6 +70,11 @@ export default async function handler(
     flags.instacart_connect = false
   }
 
+  const awsApiUrl =
+    process.env.VITE_AWS_API_URL?.trim() ||
+    process.env.AWS_API_URL?.trim() ||
+    null
+
   res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30')
-  res.status(200).json(flags)
+  res.status(200).json({ ...flags, aws_api_url: awsApiUrl || null })
 }

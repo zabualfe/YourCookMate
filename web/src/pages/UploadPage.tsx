@@ -284,9 +284,9 @@ export function UploadPage() {
         )}
 
         <p className="mt-3 text-xs text-stone-400">
-          Video import reads captions, on-screen text, spoken audio, and analyzes video frames (works for
-          silent Instagram reels and similar). Instagram/Facebook may need YTDLP_COOKIES_FILE in backend/.env.
-          Requires OPENAI_API_KEY for parsing, transcription, and video analysis.
+          Video import reads captions, on-screen text, spoken audio (Amazon Transcribe), and
+          analyzes video frames with Bedrock Nova on AWS when VITE_AWS_API_URL is set.
+          Instagram/Facebook may need YTDLP_COOKIES on the ingest worker. Recipe parsing still uses Render.
         </p>
       </div>
     </Layout>
