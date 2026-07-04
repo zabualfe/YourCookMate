@@ -50,6 +50,27 @@ aws cloudformation describe-stacks \
 
 6. Enable **Bedrock model access** in AWS Console → Bedrock → Model access → enable **Amazon Nova Lite** (for the worker step).
 
+### Troubleshooting OIDC
+
+The `deploy-aws` job uses GitHub environment **`production-aws`**. That means the OIDC token `sub` claim is:
+
+`repo:zabualfe/YourCookMate:environment:production-aws`
+
+—not `repo:...:ref:refs/heads/main`. The bootstrap template must allow **both** (already fixed in-repo).
+
+If CI fails with `Not authorized to perform sts:AssumeRoleWithWebIdentity`, re-run the bootstrap stack to update the role trust policy:
+
+```bash
+aws cloudformation deploy \
+  --stack-name yourcookmate-github-oidc \
+  --template-file aws/bootstrap/github-oidc.yaml \
+  --parameter-overrides GitHubOrg=zabualfe GitHubRepo=YourCookMate GitHubEnvironment=production-aws \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-east-1
+```
+
+Also verify `AWS_ROLE_ARN` matches the `DeployRoleArn` output and the repo name casing is exactly `YourCookMate`.
+
 ## CI deploy
 
 On push to `main`, after backend tests pass, the `deploy-aws` job runs:

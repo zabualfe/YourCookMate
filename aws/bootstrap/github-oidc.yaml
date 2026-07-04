@@ -15,6 +15,10 @@ Parameters:
     Type: String
     Default: main
     Description: Branch allowed to assume the deploy role
+  GitHubEnvironment:
+    Type: String
+    Default: production-aws
+    Description: GitHub Actions environment name used by deploy-aws job
 
 Resources:
   GitHubOidcProvider:
@@ -42,7 +46,9 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+                token.actions.githubusercontent.com:sub:
+                  - !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+                  - !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
       Policies:
         - PolicyName: YourCookMateSamDeploy
           PolicyDocument:
