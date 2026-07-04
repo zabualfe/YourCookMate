@@ -528,5 +528,67 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
     }
 
 
+_GENERIC_PREVIEW_TITLES = frozenset(
+    {"video", "instagram reel", "tiktok", "untitled", "reel", "instagram", "shorts", "facebook watch"}
+)
+
+
+def _preview_display_title(title: Optional[str], source_type: str) -> str:
+    if title and title.strip().lower() not in _GENERIC_PREVIEW_TITLES:
+        cleaned = title.strip()
+        if len(cleaned) > 120:
+            return cleaned[:117] + "…"
+        return cleaned
+    labels = {
+        "instagram": "Instagram reel",
+        "tiktok": "TikTok video",
+        "youtube": "YouTube video",
+        "facebook": "Facebook video",
+        "pinterest": "Pinterest video",
+        "vimeo": "Vimeo video",
+    }
+    return labels.get(source_type, "Video")
+
+
+def preview_social_link(url: str) -> dict:
+    """Fast metadata-only lookup (yt-dlp extract_info, no download)."""
+    try:
+        source_url = _normalize_url(url)
+    except HTTPException as exc:
+        return {
+            "valid": False,
+            "source_url": url.strip(),
+            "source_type": "video",
+            "message": str(exc.detail),
+        }
+
+    source_type = classify_video_url(source_url)
+    try:
+        info = _extract_with_ytdlp(source_url)
+    except HTTPException as exc:
+        return {
+            "valid": False,
+            "source_url": source_url,
+            "source_type": source_type,
+            "message": str(exc.detail),
+        }
+
+    title = info.get("title") or info.get("fulltitle")
+    author = info.get("uploader") or info.get("channel") or info.get("creator")
+    thumbnail_url = info.get("thumbnail")
+    raw_duration = info.get("duration")
+    duration = float(raw_duration) if isinstance(raw_duration, (int, float)) else None
+
+    return {
+        "valid": True,
+        "source_type": source_type,
+        "source_url": source_url,
+        "title": _preview_display_title(title if isinstance(title, str) else None, source_type),
+        "author": author.strip() if isinstance(author, str) and author.strip() else None,
+        "thumbnail_url": thumbnail_url if isinstance(thumbnail_url, str) else None,
+        "video_duration": duration,
+    }
+
+
 # Backwards-compatible alias
 classify_social_url = classify_video_url

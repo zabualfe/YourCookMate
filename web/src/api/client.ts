@@ -98,6 +98,15 @@ export async function ingestSocialLinkSync(payload: {
   })
 }
 
+export async function fetchLinkPreviewSync(payload: {
+  url: string
+}): Promise<import('../types/ingest').LinkPreviewResponse> {
+  return request('/ingest/preview', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function register(email: string, password: string, displayName?: string): Promise<AuthResponse> {
   return request('/auth/register', {
     method: 'POST',

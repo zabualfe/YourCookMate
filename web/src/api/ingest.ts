@@ -77,6 +77,19 @@ async function pollIngestJob(jobId: string): Promise<IngestLinkResponse> {
   throw new Error('Import timed out — try again or paste the caption manually.')
 }
 
+/** Fast link preview — title, author, thumbnail (no full import). */
+export async function fetchLinkPreview(url: string): Promise<import('../types/ingest').LinkPreviewResponse> {
+  const body = { url: url.trim() }
+  if (getAwsIngestBase()) {
+    return awsApiRequest('/ingest/preview', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+  const { fetchLinkPreviewSync } = await import('./client')
+  return fetchLinkPreviewSync(body)
+}
+
 /** Social link import — AWS async when aws_api_url is configured, else Render sync. */
 export async function ingestSocialLink(payload: {
   url: string

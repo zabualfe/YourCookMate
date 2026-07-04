@@ -160,6 +160,27 @@ Resources:
             Path: /recipes/parse
             Method: POST
 
+  PreviewLinkFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Description: Fast link preview — title, author, thumbnail via yt-dlp metadata.
+      Handler: preview_link.app.handler
+      Timeout: 45
+      MemorySize: 512
+      Environment:
+        Variables:
+          YTDLP_COOKIES_B64: !Ref YtdlpCookiesB64
+          STAGE: !Ref Stage
+      Events:
+        PreviewLink:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /ingest/preview
+            Method: POST
+
   IngestWorkerFunction:
     Type: AWS::Serverless::Function
     Metadata:

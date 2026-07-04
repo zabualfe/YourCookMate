@@ -21,6 +21,17 @@ export interface IngestLinkResponse {
   confidence: number
 }
 
+export interface LinkPreviewResponse {
+  valid: boolean
+  source_type: VideoSourceType | string
+  source_url: string
+  title?: string | null
+  author?: string | null
+  thumbnail_url?: string | null
+  video_duration?: number | null
+  message?: string | null
+}
+
 export interface ReviewDraft {
   rawText: string
   recipe: ParsedRecipe

@@ -1,105 +1,123 @@
 import { useEffect, useState } from 'react'
-import { resolveVideoEmbed, type VideoEmbedPreview } from '../lib/videoEmbed'
+import { fetchLinkPreview } from '../api/ingest'
+import { resolveVideoEmbed } from '../lib/videoEmbed'
+import type { LinkPreviewResponse } from '../types/ingest'
 import { videoPlatformLabel } from '../types/ingest'
 
 interface VideoLinkPreviewProps {
   url: string
 }
 
+function VideoThumb({ thumbnailUrl }: { thumbnailUrl: string | null | undefined }) {
+  if (thumbnailUrl) {
+    return (
+      <img
+        src={thumbnailUrl}
+        alt=""
+        className="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-green-200"
+      />
+    )
+  }
+
+  return (
+    <div
+      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-green-100 ring-1 ring-green-200"
+      aria-hidden
+    >
+      <svg className="h-6 w-6 text-green-700" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M8 5v14l11-7L8 5z" />
+      </svg>
+    </div>
+  )
+}
+
 export function VideoLinkPreview({ url }: VideoLinkPreviewProps) {
-  const [preview, setPreview] = useState<VideoEmbedPreview | null>(null)
+  const [preview, setPreview] = useState<LinkPreviewResponse | null>(null)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const trimmed = url.trim()
     if (trimmed.length < 10) {
       setPreview(null)
+      setLoading(false)
       return undefined
     }
 
-    const timer = window.setTimeout(() => {
-      setPreview(resolveVideoEmbed(trimmed))
-    }, 400)
+    setLoading(true)
+    const controller = new AbortController()
 
-    return () => window.clearTimeout(timer)
+    const timer = window.setTimeout(() => {
+      fetchLinkPreview(trimmed)
+        .then((result) => {
+          if (!controller.signal.aborted) setPreview(result)
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return
+          const fallback = resolveVideoEmbed(trimmed)
+          setPreview({
+            valid: Boolean(fallback),
+            source_type: fallback?.platform ?? 'video',
+            source_url: fallback?.normalizedUrl ?? trimmed,
+            title: fallback ? `${videoPlatformLabel(fallback.platform)} video` : null,
+            author: null,
+            thumbnail_url: fallback?.thumbnailUrl ?? null,
+            message: fallback ? null : 'Could not check this link',
+          })
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false)
+        })
+    }, 500)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
   }, [url])
+
+  if (url.trim().length < 10) return null
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+        <div className="h-14 w-14 shrink-0 animate-pulse rounded-lg bg-green-100" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-3 w-32 animate-pulse rounded bg-green-100" />
+          <div className="h-3 w-24 animate-pulse rounded bg-green-100" />
+        </div>
+      </div>
+    )
+  }
 
   if (!preview) return null
 
-  const platformLabel = videoPlatformLabel(preview.platform)
-
-  if (preview.embedUrl) {
+  if (!preview.valid) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-900 shadow-sm">
-        <div className="flex items-center justify-between border-b border-stone-700/80 bg-stone-800 px-3 py-2">
-          <p className="text-xs font-medium text-stone-200">
-            {platformLabel} preview
-          </p>
-          <a
-            href={preview.normalizedUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-medium text-brand-300 hover:text-brand-200"
-          >
-            Open original
-          </a>
-        </div>
-        <div
-          className={[
-            'relative w-full bg-black',
-            preview.isVertical ? 'mx-auto max-w-sm' : '',
-          ].join(' ')}
-        >
-          <iframe
-            src={preview.embedUrl}
-            title={`${platformLabel} video preview`}
-            className={[
-              'w-full border-0',
-              preview.isVertical ? 'aspect-[9/16] max-h-[32rem]' : 'aspect-video',
-            ].join(' ')}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-          />
-        </div>
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="font-medium">Couldn&apos;t verify this link</p>
+        <p className="mt-1 text-amber-800/90">
+          {preview.message ?? 'Check the URL or paste the caption manually.'}
+        </p>
       </div>
     )
   }
 
-  if (preview.thumbnailUrl) {
-    return (
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-stone-100 px-3 py-2">
-          <p className="text-xs font-medium text-stone-600">{platformLabel} link detected</p>
-          <a
-            href={preview.normalizedUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-medium text-brand-600 hover:text-brand-700"
-          >
-            Open video
-          </a>
-        </div>
-        <img
-          src={preview.thumbnailUrl}
-          alt=""
-          className="aspect-video w-full object-cover"
-        />
-      </div>
-    )
-  }
+  const title = preview.title || `${videoPlatformLabel(preview.source_type)} video`
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
-      <p>
-        <span className="font-medium text-stone-800">{platformLabel}</span> link detected.
-        {preview.platform === 'tiktok' && preview.normalizedUrl.includes('vm.tiktok.com') ? (
-          <> Short TikTok links can&apos;t embed until import — try importing or use the full tiktok.com URL.</>
-        ) : preview.embedUrl ? (
-          <> Preview blocked by the platform — you can still import.</>
+    <div className="flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 px-4 py-3 shadow-sm">
+      <VideoThumb thumbnailUrl={preview.thumbnail_url} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-green-950">{title}</p>
+        {preview.author ? (
+          <p className="truncate text-sm text-green-800">by {preview.author}</p>
         ) : (
-          <> Preview not available for this URL format — you can still try importing.</>
+          <p className="text-sm text-green-700">{videoPlatformLabel(preview.source_type)}</p>
         )}
-      </p>
+      </div>
+      <span className="shrink-0 rounded-full bg-green-200 px-2 py-0.5 text-xs font-semibold text-green-900">
+        ✓
+      </span>
     </div>
   )
 }

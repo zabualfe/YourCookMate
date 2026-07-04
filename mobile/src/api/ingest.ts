@@ -64,6 +64,18 @@ export function ingestUsesAws(): boolean {
   return Boolean(AWS_INGEST_BASE)
 }
 
+export async function fetchLinkPreview(url: string): Promise<import('@/types/ingest').LinkPreviewResponse> {
+  const body = { url: url.trim() }
+  if (AWS_INGEST_BASE) {
+    return awsApiRequest('/ingest/preview', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+  const { fetchLinkPreviewSync } = await import('./client')
+  return fetchLinkPreviewSync(body)
+}
+
 export async function ingestSocialLink(payload: {
   url: string
   caption?: string

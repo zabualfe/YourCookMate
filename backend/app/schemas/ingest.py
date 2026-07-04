@@ -10,6 +10,10 @@ class IngestLinkRequest(BaseModel):
     caption: Optional[str] = Field(default=None, max_length=50000)
 
 
+class LinkPreviewRequest(BaseModel):
+    url: str = Field(min_length=10, max_length=2048)
+
+
 class IngestLinkResponse(BaseModel):
     raw_text: str
     source_type: str
@@ -20,3 +24,14 @@ class IngestLinkResponse(BaseModel):
     video_duration: Optional[float] = None
     extraction_notes: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
+
+
+class LinkPreviewResponse(BaseModel):
+    valid: bool
+    source_type: str
+    source_url: str
+    title: Optional[str] = None
+    author: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    video_duration: Optional[float] = None
+    message: Optional[str] = None
