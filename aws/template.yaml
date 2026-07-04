@@ -29,7 +29,7 @@ Globals:
     Timeout: 30
     MemorySize: 256
     Architectures:
-      - arm64
+      - x86_64
     CodeUri: src/
 
 Resources:

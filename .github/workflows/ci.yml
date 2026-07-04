@@ -200,7 +200,7 @@ jobs:
         run: sam validate --lint
 
       - name: SAM build
-        run: sam build --use-container --build-image public.ecr.aws/sam/build-python3.12:latest-arm64
+        run: sam build --use-container
 
       - name: SAM deploy
         env:
