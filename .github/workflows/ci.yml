@@ -150,6 +150,14 @@ jobs:
             echo "::error::AWS_ROLE_ARN and AWS_REGION secrets are required. See aws/README.md"
             exit 1
           fi
+          role="${{ secrets.AWS_ROLE_ARN }}"
+          if [[ ! "$role" =~ ^arn:aws:iam::[0-9]+:role/ ]]; then
+            echo "::error::AWS_ROLE_ARN must look like arn:aws:iam::123456789012:role/yourcookmate-github-deploy-zabualfe"
+            exit 1
+          fi
+          echo "Using IAM role: ${role##*/}"
+          echo "If OIDC still fails, run ./aws/bootstrap/fix-trust-policy.sh locally and check"
+          echo "GitHub → Environments → production-aws → Environment secrets (overrides repo secrets)."
 
       - name: Debug GitHub OIDC token (sub claim)
         run: |
