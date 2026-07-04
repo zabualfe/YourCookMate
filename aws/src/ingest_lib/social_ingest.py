@@ -136,7 +136,10 @@ def _extract_with_ytdlp(url: str) -> dict:
     try:
         import yt_dlp
     except ImportError as exc:
-        raise IngestError("Video import is not available (yt-dlp missing on worker).") from exc
+        raise IngestError(
+            "Video import is not available (yt-dlp missing on worker). "
+            "Redeploy the AWS stack so the ingest worker includes requirements-worker.txt."
+        ) from exc
 
     try:
         with yt_dlp.YoutubeDL(_ytdlp_options()) as ydl:

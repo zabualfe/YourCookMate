@@ -31,6 +31,11 @@ def _process_job(message: dict[str, Any]) -> None:
 
 
 def handler(event, context):
+    try:
+        import yt_dlp  # noqa: F401
+    except ImportError:
+        logger.error("yt-dlp not importable in worker artifact — rebuild with Makefile + sam build --use-container")
+
     failures: list[dict[str, str]] = []
     for record in event.get("Records", []):
         body = json.loads(record["body"])

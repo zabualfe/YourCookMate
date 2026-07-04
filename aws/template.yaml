@@ -131,8 +131,7 @@ Resources:
   IngestWorkerFunction:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: python3.12
-      RequirementsFile: requirements-worker.txt
+      BuildMethod: makefile
     Properties:
       Description: Native ingest — yt-dlp, Bedrock Nova vision, Amazon Transcribe.
       Handler: ingest_worker.app.handler
