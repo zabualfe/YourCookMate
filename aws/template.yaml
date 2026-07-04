@@ -25,6 +25,46 @@ Parameters:
   FrontendUrl:
     Type: String
     Default: "*"
+  ResendApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Resend API key for verification emails (HTTPS from Lambda).
+  EmailApiSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Shared secret — Render backend sends Authorization Bearer on POST /email/send.
+  SmtpFrom:
+    Type: String
+    Default: noreply@yourcookmate.com
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+  CorsOrigins:
+    Type: String
+    Default: "*"
+    Description: Comma-separated origins for FastAPI CORS (e.g. https://yourcookmate.com,https://your-cook-mate.vercel.app).
+  GoogleClientId:
+    Type: String
+    Default: ""
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+  GoogleIosClientId:
+    Type: String
+    Default: ""
+  AppleClientId:
+    Type: String
+    Default: ""
+  AppleIosClientId:
+    Type: String
+    Default: ""
+  AdminEmails:
+    Type: String
+    Default: ""
 
 Globals:
   Function:
@@ -36,6 +76,38 @@ Globals:
     CodeUri: src/
 
 Resources:
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3600
+
+  UploadsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UploadsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadUploads
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${UploadsBucket.Arn}/*"
+
   IngestTempBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -58,6 +130,9 @@ Resources:
         AllowMethods:
           - GET
           - POST
+          - PUT
+          - PATCH
+          - DELETE
           - OPTIONS
         AllowHeaders:
           - Content-Type
@@ -79,17 +154,57 @@ Resources:
         deadLetterTargetArn: !GetAtt IngestDLQ.Arn
         maxReceiveCount: 3
 
-  HealthFunction:
+  ApiFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
     Properties:
-      Handler: health.app.handler
+      Description: FastAPI auth, recipes, collections, admin (Mangum).
+      Handler: lambda_handler.handler
+      Timeout: 30
+      MemorySize: 1024
+      CodeUri: ../backend/
+      Environment:
+        Variables:
+          DATABASE_URL: !Ref DatabaseUrl
+          JWT_SECRET: !Ref JwtSecret
+          API_BASE_URL: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+          FRONTEND_URL: !Ref FrontendUrl
+          CORS_ORIGINS: !Ref CorsOrigins
+          RESEND_API_KEY: !Ref ResendApiKey
+          SMTP_FROM: !Ref SmtpFrom
+          UPLOADS_BUCKET: !Ref UploadsBucket
+          UPLOADS_PUBLIC_BASE_URL: !Sub "https://${UploadsBucket}.s3.${AWS::Region}.amazonaws.com"
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
+          GOOGLE_IOS_CLIENT_ID: !Ref GoogleIosClientId
+          APPLE_CLIENT_ID: !Ref AppleClientId
+          APPLE_IOS_CLIENT_ID: !Ref AppleIosClientId
+          ADMIN_EMAILS: !Ref AdminEmails
+          FEATURE_AUTH: "true"
+          FEATURE_REGISTRATION: "true"
+          FEATURE_AI: "true"
+          FEATURE_SOCIAL_INGEST: "true"
+          FEATURE_COMMUNITY: "true"
+          FEATURE_INSTACART: "false"
+          INSTACART_ENABLED: "false"
+          STAGE: !Ref Stage
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref UploadsBucket
       Events:
-        Health:
+        ApiRoot:
           Type: HttpApi
           Properties:
             ApiId: !Ref HttpApi
-            Path: /health
-            Method: GET
+            Path: /
+            Method: ANY
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
 
   EnqueueIngestFunction:
     Type: AWS::Serverless::Function
@@ -181,6 +296,29 @@ Resources:
             Path: /ingest/preview
             Method: POST
 
+  SendEmailFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      Description: Internal email send via Resend (optional — ApiFunction also sends directly).
+      Handler: send_email.app.handler
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          RESEND_API_KEY: !Ref ResendApiKey
+          EMAIL_API_SECRET: !Ref EmailApiSecret
+          SMTP_FROM: !Ref SmtpFrom
+          STAGE: !Ref Stage
+      Events:
+        SendEmail:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /email/send
+            Method: POST
+
   IngestWorkerFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -228,8 +366,11 @@ Resources:
 
 Outputs:
   ApiEndpoint:
-    Description: Set VITE_AWS_API_URL / AWS_API_URL on Vercel
+    Description: Set VITE_API_URL and VITE_AWS_API_URL on Vercel to this URL (single API).
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+  UploadsBucketName:
+    Description: Public S3 bucket for recipe icons and media
+    Value: !Ref UploadsBucket
   IngestTempBucketName:
     Description: S3 bucket for transient transcribe audio
     Value: !Ref IngestTempBucket

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_ICON_TYPES = {
     "image/jpeg": ".jpg",
@@ -15,6 +18,16 @@ ALLOWED_ICON_TYPES = {
 }
 
 
+def _use_s3() -> bool:
+    return bool(settings.uploads_bucket)
+
+
+def _s3_client():
+    import boto3
+
+    return boto3.client("s3")
+
+
 def uploads_root() -> Path:
     root = Path(settings.uploads_dir)
     root.mkdir(parents=True, exist_ok=True)
@@ -22,11 +35,17 @@ def uploads_root() -> Path:
     return root
 
 
-def icon_public_url(icon_path: str | None) -> str | None:
-    if not icon_path:
+def media_public_url(relative_path: str | None) -> str | None:
+    if not relative_path:
         return None
-    path = f"/uploads/{icon_path.lstrip('/')}"
-    return f"{settings.api_base_url.rstrip('/')}{path}"
+    rel = relative_path.removeprefix("/uploads/").lstrip("/")
+    if _use_s3() and settings.uploads_public_base_url:
+        return f"{settings.uploads_public_base_url.rstrip('/')}/{rel}"
+    return f"{settings.api_base_url.rstrip('/')}/uploads/{rel}"
+
+
+def icon_public_url(icon_path: str | None) -> str | None:
+    return media_public_url(icon_path)
 
 
 def _icon_file_path(icon_path: str) -> Path:
@@ -35,6 +54,14 @@ def _icon_file_path(icon_path: str) -> Path:
 
 def delete_icon_file(icon_path: str | None) -> None:
     if not icon_path:
+        return
+    if _use_s3():
+        from botocore.exceptions import ClientError
+
+        try:
+            _s3_client().delete_object(Bucket=settings.uploads_bucket, Key=icon_path)
+        except ClientError:
+            logger.exception("Failed to delete S3 icon %s", icon_path)
         return
     path = _icon_file_path(icon_path)
     if path.is_file():
@@ -60,6 +87,16 @@ async def save_recipe_icon(recipe_id: uuid.UUID, upload: UploadFile) -> str:
 
     ext = ALLOWED_ICON_TYPES[content_type]
     relative = f"recipes/{recipe_id}{ext}"
+
+    if _use_s3():
+        _s3_client().put_object(
+            Bucket=settings.uploads_bucket,
+            Key=relative,
+            Body=data,
+            ContentType=content_type,
+        )
+        return relative
+
     path = _icon_file_path(relative)
     path.write_bytes(data)
     return relative

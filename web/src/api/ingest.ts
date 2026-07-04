@@ -1,6 +1,9 @@
 import type { IngestLinkResponse } from '../types/ingest'
 
-const BUILD_TIME_AWS_BASE = (import.meta.env.VITE_AWS_API_URL as string | undefined)?.replace(/\/$/, '')
+const BUILD_TIME_AWS_BASE = (
+  (import.meta.env.VITE_AWS_API_URL as string | undefined) ||
+  (import.meta.env.VITE_API_URL as string | undefined)
+)?.replace(/\/$/, '')
 
 /** Runtime override from /api/features (Vercel env without rebuild). */
 let runtimeAwsBase: string | undefined = BUILD_TIME_AWS_BASE

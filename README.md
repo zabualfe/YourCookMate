@@ -99,45 +99,50 @@ Without `OPENAI_API_KEY`, a heuristic fallback parser is used.
 
 See [REFERENCE.md](./REFERENCE.md) for the full product plan.
 
-## Deploy backend (Render)
+## Deploy API (AWS)
 
-The API is configured via [`render.yaml`](./render.yaml) at the repo root.
+The full backend runs on **AWS API Gateway + Lambda** via [SAM](https://aws.amazon.com/serverless/sam/) in [`aws/`](./aws/). GitHub Actions deploys on push to `main` after backend tests pass.
 
-1. **Push** `render.yaml` and backend changes to GitHub (`main`).
-2. In [Render](https://dashboard.render.com/) → **New** → **Blueprint** → connect `YourCookMate` repo.
-3. When prompted for secret env vars, paste values from your local `backend/.env`:
+**One API URL** for auth, recipes, ingest, and parse:
 
-   | Variable | Value |
-   |----------|--------|
-   | `DATABASE_URL` | Supabase session pooler URL (port 5432) |
-   | `API_BASE_URL` | `https://yourcookmate-api.onrender.com` |
-   | `FRONTEND_URL` | Your Vercel production URL |
-   | `CORS_ORIGINS` | Same as `FRONTEND_URL` |
-   | `OPENAI_API_KEY` | From OpenAI dashboard |
-   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
-   | `GOOGLE_IOS_CLIENT_ID` | iOS OAuth client (mobile sign-in) |
-   | `RESEND_API_KEY` | From Resend |
-   | `SMTP_FROM` | Verified sender in Resend |
+```
+https://{api-id}.execute-api.us-east-1.amazonaws.com/prod
+```
 
-4. After deploy, confirm **https://yourcookmate-api.onrender.com/health** returns `{"status":"ok"}`.
-5. **Auto-deploy on push to `main`** (after backend tests pass):
-   - Render → **yourcookmate-api** → **Settings** → **Deploy Hook** → copy URL
-   - GitHub → **Settings** → **Secrets and variables** → **Actions** → add `RENDER_DEPLOY_HOOK_URL`
-   - In Render **Settings**, set **Auto-Deploy** to **Off** (CI triggers deploys via the hook)
-6. In **Vercel** (web project), set `VITE_API_URL` to the Render URL and redeploy.
-7. In **Google Cloud Console**, add authorized origins/redirect URIs for production:
-   - Web origin: your Vercel URL
-   - API callback: `https://yourcookmate-api.onrender.com/auth/google/mobile/callback`
+### GitHub secrets (Actions)
 
-**Note:** Render free tier spins down after ~15 min idle; first request may take ~30s. Uploaded recipe icons use ephemeral disk and reset on redeploy — use object storage later for persistence.
+| Secret | Purpose |
+|--------|---------|
+| `AWS_ROLE_ARN`, `AWS_REGION` | OIDC deploy role |
+| `AWS_DATABASE_URL` | Supabase pooler URL |
+| `AWS_JWT_SECRET` | JWT signing |
+| `AWS_FRONTEND_URL` | Primary frontend origin |
+| `AWS_CORS_ORIGINS` | Comma-separated (prod + QA) |
+| `AWS_RESEND_API_KEY` | Verification email |
+| `AWS_GOOGLE_*`, `AWS_APPLE_*` | OAuth |
+| `AWS_YTDLP_COOKIES_B64` | Instagram import cookies |
 
-## Deploy AWS (API Gateway + SQS + Lambda)
+See [`aws/README.md`](./aws/README.md) for OIDC bootstrap and local `sam deploy`.
 
-Async ingest runs on AWS via [SAM](https://aws.amazon.com/serverless/sam/) in [`aws/`](./aws/). GitHub Actions deploys on push to `main` after backend tests pass.
+### Vercel env
 
-**Quick setup:** follow [`aws/README.md`](./aws/README.md) — one-time OIDC bootstrap, then add GitHub secrets `AWS_ROLE_ARN`, `AWS_REGION`, and optionally `AWS_DATABASE_URL` + `AWS_FRONTEND_URL`.
+| Variable | Value |
+|----------|--------|
+| `VITE_API_URL` | AWS `ApiEndpoint` |
+| `VITE_AWS_API_URL` | Optional — defaults to `VITE_API_URL` |
 
-Render and Vercel stay live while AWS is built out in parallel.
+### OAuth redirect URIs
+
+Update Google / Apple / Instacart consoles to use the AWS API base:
+
+```
+https://{api-id}.execute-api.us-east-1.amazonaws.com/prod/auth/google/mobile/callback
+https://{api-id}.execute-api.us-east-1.amazonaws.com/prod/auth/instacart/connect/callback
+```
+
+### Retire Render
+
+After cutover, delete the `yourcookmate-api` service on Render. [`render.yaml`](./render.yaml) is deprecated.
 
 ## iOS app
 

@@ -1,6 +1,8 @@
 import type { IngestLinkResponse } from '@/types/ingest'
 
-const AWS_INGEST_BASE = process.env.EXPO_PUBLIC_AWS_API_URL?.replace(/\/$/, '')
+const AWS_INGEST_BASE = (
+  process.env.EXPO_PUBLIC_AWS_API_URL || process.env.EXPO_PUBLIC_API_URL
+)?.replace(/\/$/, '')
 
 const JOB_POLL_MS = 1000
 const JOB_POLL_MS_MAX = 2000

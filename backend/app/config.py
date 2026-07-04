@@ -43,7 +43,13 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     api_base_url: str = "http://127.0.0.1:8000"
 
+    uploads_bucket: Optional[str] = None
+    uploads_public_base_url: Optional[str] = None
+
     resend_api_key: Optional[str] = None
+    # AWS API Gateway email endpoint (same HttpApi as ingest). Preferred on Render.
+    email_api_url: Optional[str] = None
+    email_api_secret: Optional[str] = None
 
     smtp_host: Optional[str] = None
     smtp_port: int = 587
@@ -96,6 +102,7 @@ class Settings(BaseSettings):
     @field_validator(
         "openai_api_key",
         "resend_api_key",
+        "email_api_secret",
         "google_client_secret",
         mode="before",
     )

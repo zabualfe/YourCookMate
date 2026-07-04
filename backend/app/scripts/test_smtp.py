@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 
 from app.config import settings
-from app.services.email import send_email
+from app.services.email import _email_configured, email_transport, send_email
 
 
 def main() -> None:
@@ -17,12 +17,13 @@ def main() -> None:
         print("Usage: python -m app.scripts.test_smtp <recipient@email.com>")
         sys.exit(1)
 
-    if not settings.smtp_host:
-        print("SMTP is not configured. Set RESEND_API_KEY (or SMTP_PASSWORD) and SMTP_HOST in backend/.env")
+    if not _email_configured():
+        print("Email is not configured. Set EMAIL_API_URL + EMAIL_API_SECRET, or RESEND_API_KEY, in backend/.env")
         sys.exit(1)
 
+    transport = email_transport()
     recipient = sys.argv[1]
-    print(f"Sending test email via {settings.smtp_host}:{settings.smtp_port} to {recipient}…")
+    print(f"Sending test email via {transport} to {recipient}…")
 
     try:
         send_email(

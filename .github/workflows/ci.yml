@@ -1,19 +1,23 @@
 name: CI
 
 # Web deploys to Vercel on push to main after tests + build pass.
-# API deploys to Render via deploy hook after backend tests pass.
+# API deploys to AWS (SAM) after backend tests pass.
 #
 # GitHub secrets (Settings → Secrets and variables → Actions):
 #   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
-#   RENDER_DEPLOY_HOOK_URL — Render → yourcookmate-api → Settings → Deploy Hook
 #   AWS_ROLE_ARN, AWS_REGION — from aws/bootstrap/github-oidc.yaml (OIDC deploy role)
 #   AWS_DATABASE_URL — Supabase pooler URL
-#   AWS_FRONTEND_URL — Vercel URL for CORS
-#   AWS_YTDLP_COOKIES_B64 — base64 of backend/cookies.social.txt (run ./aws/bootstrap/encode-cookies.sh)
+#   AWS_JWT_SECRET — same as production JWT_SECRET
+#   AWS_FRONTEND_URL — primary Vercel/custom domain for CORS
+#   AWS_CORS_ORIGINS — comma-separated (prod + QA origins)
+#   AWS_GOOGLE_CLIENT_ID, AWS_GOOGLE_CLIENT_SECRET, AWS_GOOGLE_IOS_CLIENT_ID
+#   AWS_APPLE_CLIENT_ID, AWS_APPLE_IOS_CLIENT_ID (optional)
+#   AWS_RESEND_API_KEY — Resend API key
+#   AWS_YTDLP_COOKIES_B64 — base64 of backend/cookies.social.txt
 #
 # Vercel project env vars:
-#   VITE_API_URL — Render API (auth, recipes, parse)
-#   VITE_AWS_API_URL — AWS API Gateway base (async video ingest)
+#   VITE_API_URL — AWS API Gateway base (auth, recipes, ingest)
+#   VITE_AWS_API_URL — optional; defaults to VITE_API_URL when unset
 
 on:
   push:
@@ -104,39 +108,13 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Deployed to $url"
 
-  deploy-render:
-    name: Deploy to Render (production)
-    needs: [backend]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment:
-      name: production-api
-      url: https://yourcookmate-api.onrender.com
-    steps:
-      - name: Trigger Render deploy
-        env:
-          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [[ -z "$DEPLOY_HOOK" ]]; then
-            echo "::error::RENDER_DEPLOY_HOOK_URL secret is missing"
-            exit 1
-          fi
-          # Hook URLs already include ?key=… — use &ref=, not a second ?
-          if [[ "$DEPLOY_HOOK" == *"?"* ]]; then
-            url="${DEPLOY_HOOK}&ref=${{ github.sha }}"
-          else
-            url="${DEPLOY_HOOK}?ref=${{ github.sha }}"
-          fi
-          curl -fsS "$url"
-          echo "Triggered Render deploy for ${{ github.sha }}"
-
   deploy-aws:
     name: Deploy to AWS (SAM)
     needs: [backend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    # No GitHub environment here — environment secrets override repo secrets and
-    # often cause a stale/wrong AWS_ROLE_ARN. OIDC sub will be ref:refs/heads/main.
+    environment:
+      name: production-api
     permissions:
       id-token: write
       contents: read
@@ -205,8 +183,16 @@ jobs:
       - name: SAM deploy
         env:
           DATABASE_URL: ${{ secrets.AWS_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.AWS_JWT_SECRET }}
           FRONTEND_URL: ${{ secrets.AWS_FRONTEND_URL }}
+          CORS_ORIGINS: ${{ secrets.AWS_CORS_ORIGINS }}
           YTDLP_COOKIES_B64: ${{ secrets.AWS_YTDLP_COOKIES_B64 }}
+          RESEND_API_KEY: ${{ secrets.AWS_RESEND_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.AWS_GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.AWS_GOOGLE_CLIENT_SECRET }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.AWS_GOOGLE_IOS_CLIENT_ID }}
+          APPLE_CLIENT_ID: ${{ secrets.AWS_APPLE_CLIENT_ID }}
+          APPLE_IOS_CLIENT_ID: ${{ secrets.AWS_APPLE_IOS_CLIENT_ID }}
         run: |
           overrides=( "Stage=prod" )
           if [[ -n "${FRONTEND_URL:-}" ]]; then
@@ -214,13 +200,41 @@ jobs:
           else
             overrides+=( "FrontendUrl=*" )
           fi
+          if [[ -n "${CORS_ORIGINS:-}" ]]; then
+            overrides+=( "CorsOrigins=${CORS_ORIGINS}" )
+          elif [[ -n "${FRONTEND_URL:-}" ]]; then
+            overrides+=( "CorsOrigins=${FRONTEND_URL}" )
+          else
+            overrides+=( "CorsOrigins=*" )
+          fi
           if [[ -n "${DATABASE_URL:-}" ]]; then
             overrides+=( "DatabaseUrl=${DATABASE_URL}" )
+          fi
+          if [[ -n "${JWT_SECRET:-}" ]]; then
+            overrides+=( "JwtSecret=${JWT_SECRET}" )
           fi
           if [[ -n "${YTDLP_COOKIES_B64:-}" ]]; then
             overrides+=( "YtdlpCookiesB64=${YTDLP_COOKIES_B64}" )
           fi
-          echo "Deploying: Stage, FrontendUrl${DATABASE_URL:+, DatabaseUrl}${YTDLP_COOKIES_B64:+, YtdlpCookiesB64}"
+          if [[ -n "${RESEND_API_KEY:-}" ]]; then
+            overrides+=( "ResendApiKey=${RESEND_API_KEY}" )
+          fi
+          if [[ -n "${GOOGLE_CLIENT_ID:-}" ]]; then
+            overrides+=( "GoogleClientId=${GOOGLE_CLIENT_ID}" )
+          fi
+          if [[ -n "${GOOGLE_CLIENT_SECRET:-}" ]]; then
+            overrides+=( "GoogleClientSecret=${GOOGLE_CLIENT_SECRET}" )
+          fi
+          if [[ -n "${GOOGLE_IOS_CLIENT_ID:-}" ]]; then
+            overrides+=( "GoogleIosClientId=${GOOGLE_IOS_CLIENT_ID}" )
+          fi
+          if [[ -n "${APPLE_CLIENT_ID:-}" ]]; then
+            overrides+=( "AppleClientId=${APPLE_CLIENT_ID}" )
+          fi
+          if [[ -n "${APPLE_IOS_CLIENT_ID:-}" ]]; then
+            overrides+=( "AppleIosClientId=${APPLE_IOS_CLIENT_ID}" )
+          fi
+          echo "Deploying AWS stack (Stage, ApiFunction, ingest workers…)"
           sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"
 
       - name: Print CloudFormation errors on failure

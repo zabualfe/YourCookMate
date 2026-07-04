@@ -14,7 +14,6 @@ from app.schemas.share import SharedRecipeResponse
 from app.schemas.shop import InstacartLinkResponse
 from app.services.instacart import get_or_create_instacart_link
 from app.services.recipe_icons import icon_public_url
-from app.services.step_images import copy_step_images, enrich_recipe_step_urls
 
 router = APIRouter(prefix="/r", tags=["share"])
 
@@ -39,6 +38,8 @@ def _get_public_recipe(db: Session, slug: str) -> Recipe:
 
 @router.get("/{slug}", response_model=SharedRecipeResponse)
 def get_shared_recipe(slug: str, db: Session = Depends(get_db)) -> SharedRecipeResponse:
+    from app.services.step_images import enrich_recipe_step_urls
+
     row = _get_public_recipe(db, slug)
     parsed = ParsedRecipe.model_validate(row.parsed_json)
     parsed = enrich_recipe_step_urls(parsed)
@@ -72,6 +73,8 @@ def save_shared_recipe(
     db: Session = Depends(get_db),
     user: User = Depends(require_verified_email),
 ) -> RecipeDetailResponse:
+    from app.services.step_images import copy_step_images, enrich_recipe_step_urls
+
     source = _get_public_recipe(db, slug)
     if source.user_id == user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This recipe is already in your library")

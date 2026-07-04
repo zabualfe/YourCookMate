@@ -1,19 +1,17 @@
 # YourCookMate AWS (SAM)
 
-API Gateway + SQS + Lambda for async ingest. Supabase stays the database; Bedrock Nova and Firebase auth come in follow-up steps.
+**Single API** on API Gateway + Lambda: auth, recipes, collections, async ingest, Bedrock parse, email, and S3 uploads.
+
+Supabase is the database; Vercel hosts the web app.
 
 ## What gets deployed
 
 | Resource | Purpose |
 |----------|---------|
-| HTTP API | `GET /health`, `POST /ingest/link`, `GET /jobs/{job_id}`, `POST /recipes/parse` |
-| SQS `yourcookmate-ingest-prod` | Ingest job queue |
-| SQS DLQ | Failed jobs after 3 retries |
-| `enqueue-ingest` Lambda | Validates request → SQS message → `202` + `job_id` |
-| `parse-recipe` Lambda | Bedrock Nova — breaks raw text into structured steps |
-| `ingest-worker` Lambda | SQS consumer — yt-dlp, Bedrock vision, Transcribe |
-
-Render + Vercel keep running in parallel until the AWS API is fully wired.
+| HTTP API | All routes — auth, CRUD, ingest, parse, email, health |
+| `ApiFunction` | FastAPI via Mangum — auth, recipes, collections, admin |
+| SQS + worker | Async video ingest (yt-dlp, Bedrock, Transcribe) |
+| S3 `UploadsBucket` | Recipe icons and media (public read) |
 
 ## One-time AWS setup (OIDC for GitHub Actions)
 
@@ -121,17 +119,30 @@ Import from link → AWS API → SQS → Worker Lambda
   → client polls GET /jobs/{id}
 ```
 
-**No Render** for ingestion. Render still serves auth, recipes, and `/recipes/parse`.
+When `VITE_API_URL` points at AWS:
+
+```
+All API calls → API Gateway
+  Auth / recipes / collections → ApiFunction (Mangum + FastAPI)
+  Import from link → enqueue Lambda → SQS → worker
+  Parse text → ParseRecipeFunction (Bedrock Nova)
+  Email verify → ApiFunction → Resend HTTPS API
+  Icons → S3 UploadsBucket
+```
 
 ### GitHub secrets (SAM deploy)
 
 | Secret | Value |
 |--------|--------|
+| `AWS_ROLE_ARN`, `AWS_REGION` | OIDC deploy role |
 | `AWS_DATABASE_URL` | Supabase pooler URL |
-| `AWS_FRONTEND_URL` | Vercel URL |
+| `AWS_JWT_SECRET` | JWT signing (keep stable across deploys) |
+| `AWS_FRONTEND_URL` | Primary frontend URL |
+| `AWS_CORS_ORIGINS` | Comma-separated origins (prod + QA) |
+| `AWS_RESEND_API_KEY` | Resend API key |
+| `AWS_GOOGLE_CLIENT_ID`, `AWS_GOOGLE_CLIENT_SECRET`, `AWS_GOOGLE_IOS_CLIENT_ID` | Google OAuth |
+| `AWS_APPLE_CLIENT_ID`, `AWS_APPLE_IOS_CLIENT_ID` | Apple Sign In (optional) |
 | `AWS_YTDLP_COOKIES_B64` | Run `./aws/bootstrap/encode-cookies.sh` on `backend/cookies.social.txt` |
-
-Enable **Amazon Nova Lite** in Bedrock model access.
 
 Get AWS URL after deploy:
 
@@ -139,6 +150,8 @@ Get AWS URL after deploy:
 aws cloudformation describe-stacks --stack-name yourcookmate \
   --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" --output text
 ```
+
+Set that URL as `VITE_API_URL` on Vercel. `GET /health` should return `"runtime": "lambda"`.
 
 ## Test the deployed API
 
@@ -158,8 +171,7 @@ Check worker logs in CloudWatch → `/aws/lambda/yourcookmate-IngestWorkerFuncti
 
 ## Next integration steps
 
-1. `jobs` table in Supabase + worker writes status/result
-2. Bedrock Nova in `ingest_worker` (replace OpenAI parse)
-3. Supabase Storage for step images / icons
-4. Firebase JWT authorizer on API Gateway
-5. Point `VITE_API_URL` (or a separate `VITE_AWS_API_URL`) at the AWS API when ready
+1. Custom domain on API Gateway (e.g. `api.yourcookmate.com`)
+2. Firebase JWT authorizer on API Gateway
+3. CloudFront in front of S3 uploads
+4. Provisioned concurrency on `ApiFunction` if cold starts matter

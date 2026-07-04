@@ -73,6 +73,7 @@ export default async function handler(
   const awsApiUrl =
     process.env.VITE_AWS_API_URL?.trim() ||
     process.env.AWS_API_URL?.trim() ||
+    apiUrl?.trim() ||
     null
 
   res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30')

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -10,14 +11,17 @@ from app.config import settings
 from app.database import init_db
 from app.schemas.features import FeaturesResponse
 from app.services.feature_flags import build_features_response
-from app.routers import admin, auth, collections, community, ingest, recipes, share
+from app.routers import admin, auth, collections, community, recipes, share
 from app.services.recipe_icons import uploads_root
+
+LAMBDA_MODE = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    uploads_root()
+    if not LAMBDA_MODE:
+        init_db()
+        uploads_root()
     yield
 
 
@@ -29,7 +33,7 @@ def _allowed_cors_origins() -> list[str]:
     return origins
 
 
-app = FastAPI(title="Your Cook Mate API", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="Your Cook Mate API", version="0.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,22 +45,30 @@ app.add_middleware(
 
 app.include_router(admin.router)
 app.include_router(auth.router)
-app.include_router(ingest.router)
+if not LAMBDA_MODE:
+    from app.routers import ingest
+
+    app.include_router(ingest.router)
 app.include_router(recipes.router)
 app.include_router(share.router)
 app.include_router(community.router)
 app.include_router(collections.router)
 
-uploads_path = uploads_root()
-app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
+if not LAMBDA_MODE and not settings.uploads_bucket:
+    uploads_path = uploads_root()
+    app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 
 @app.get("/health")
 def health() -> dict:
+    from app.services.email import _email_configured, email_transport
+
     return {
         "status": "ok",
-        "smtp_configured": bool(settings.smtp_host and settings.smtp_pass),
+        "email_configured": _email_configured(),
+        "email_transport": email_transport(),
         "smtp_from": settings.smtp_from,
+        "runtime": "lambda" if LAMBDA_MODE else "server",
     }
 
 

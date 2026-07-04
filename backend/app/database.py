@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -12,6 +14,11 @@ if settings.uses_sqlite:
 elif settings.uses_supabase:
     connect_args["sslmode"] = "require"
     engine_kwargs["pool_recycle"] = 3600
+
+if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    from sqlalchemy.pool import NullPool
+
+    engine_kwargs["poolclass"] = NullPool
 
 engine = create_engine(
     settings.resolved_database_url,
