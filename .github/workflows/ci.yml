@@ -193,6 +193,7 @@ jobs:
           GOOGLE_IOS_CLIENT_ID: ${{ secrets.AWS_GOOGLE_IOS_CLIENT_ID }}
           APPLE_CLIENT_ID: ${{ secrets.AWS_APPLE_CLIENT_ID }}
           APPLE_IOS_CLIENT_ID: ${{ secrets.AWS_APPLE_IOS_CLIENT_ID }}
+          API_BASE_URL: ${{ secrets.AWS_API_BASE_URL }}
         run: |
           overrides=( "Stage=prod" )
           if [[ -n "${FRONTEND_URL:-}" ]]; then
@@ -233,6 +234,9 @@ jobs:
           fi
           if [[ -n "${APPLE_IOS_CLIENT_ID:-}" ]]; then
             overrides+=( "AppleIosClientId=${APPLE_IOS_CLIENT_ID}" )
+          fi
+          if [[ -n "${API_BASE_URL:-}" ]]; then
+            overrides+=( "ApiBaseUrl=${API_BASE_URL}" )
           fi
           echo "Deploying AWS stack (Stage, ApiFunction, ingest workers…)"
           sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"

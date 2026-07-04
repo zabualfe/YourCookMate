@@ -65,6 +65,10 @@ Parameters:
   AdminEmails:
     Type: String
     Default: ""
+  ApiBaseUrl:
+    Type: String
+    Default: ""
+    Description: Public API URL for OAuth callbacks (optional — derived from request Host when empty).
 
 Globals:
   Function:
@@ -168,7 +172,7 @@ Resources:
         Variables:
           DATABASE_URL: !Ref DatabaseUrl
           JWT_SECRET: !Ref JwtSecret
-          API_BASE_URL: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+          API_BASE_URL: !Ref ApiBaseUrl
           FRONTEND_URL: !Ref FrontendUrl
           CORS_ORIGINS: !Ref CorsOrigins
           RESEND_API_KEY: !Ref ResendApiKey
