@@ -44,8 +44,8 @@ Parameters:
     Default: ""
   CorsOrigins:
     Type: String
-    Default: "*"
-    Description: Comma-separated origins for FastAPI CORS (e.g. https://yourcookmate.com,https://your-cook-mate.vercel.app).
+    Default: "https://yourcookmate.com,https://www.yourcookmate.com,https://your-cook-mate.vercel.app,http://localhost:5173"
+    Description: Comma-separated origins for API Gateway CORS and FastAPI (no spaces).
   GoogleClientId:
     Type: String
     Default: ""
@@ -141,8 +141,9 @@ Resources:
         AllowHeaders:
           - Content-Type
           - Authorization
-        AllowOrigins:
-          - !Ref FrontendUrl
+        AllowOrigins: !Split
+          - ","
+          - !Ref CorsOrigins
 
   IngestDLQ:
     Type: AWS::SQS::Queue

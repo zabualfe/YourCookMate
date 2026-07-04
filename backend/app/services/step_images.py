@@ -11,7 +11,7 @@ from openai import OpenAI
 
 from app.config import settings
 from app.schemas.recipe import ParsedRecipe, RecipeStep
-from app.services.recipe_icons import uploads_root
+from app.services.recipe_icons import media_public_url, uploads_root
 from app.services.social_ingest import _ytdlp_options
 from app.services.video_cache import (
     ensure_video_cached,
@@ -38,9 +38,7 @@ Every step must appear exactly once. Frame numbers are 1-indexed."""
 def public_upload_url(relative_path: str | None) -> str | None:
     if not relative_path:
         return None
-    if relative_path.startswith("/uploads/"):
-        return relative_path
-    return f"/uploads/{relative_path.lstrip('/')}"
+    return media_public_url(relative_path)
 
 
 def enrich_recipe_step_urls(recipe: ParsedRecipe) -> ParsedRecipe:

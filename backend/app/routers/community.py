@@ -12,6 +12,7 @@ from app.models.user import User
 from app.routers.share import _author_name
 from app.schemas.share import CommunityRecipeListResponse, CommunityRecipeSummary
 from app.services.feature_flags import require_community_enabled
+from app.services.recipe_icons import icon_public_url
 
 router = APIRouter(prefix="/community", tags=["community"])
 
