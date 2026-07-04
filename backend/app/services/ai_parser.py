@@ -241,6 +241,9 @@ def parse_recipe(raw_text: str) -> Tuple[ParsedRecipe, bool]:
     if not cleaned:
         return _heuristic_parse(raw_text), False
 
+    if not settings.feature_ai_enabled:
+        return _heuristic_parse(cleaned), False
+
     if not settings.openai_api_key:
         return _heuristic_parse(cleaned), False
 

@@ -9,9 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import init_db
 from app.schemas.features import FeaturesResponse
-from app.services.instacart import instacart_shopping_available
-from app.services.instacart_connect import connect_is_configured
-from app.routers import auth, collections, community, ingest, recipes, share
+from app.services.feature_flags import build_features_response
+from app.routers import admin, auth, collections, community, ingest, recipes, share
 from app.services.recipe_icons import uploads_root
 
 
@@ -40,6 +39,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(ingest.router)
 app.include_router(recipes.router)
@@ -58,8 +58,4 @@ def health() -> dict:
 
 @app.get("/features", response_model=FeaturesResponse)
 def features() -> FeaturesResponse:
-    return FeaturesResponse(
-        instacart=settings.instacart_enabled,
-        instacart_shopping=instacart_shopping_available(),
-        instacart_connect=connect_is_configured(),
-    )
+    return build_features_response()

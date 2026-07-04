@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { createInstacartLink, createSharedInstacartLink, getFeatures } from '../api/client'
+import { createInstacartLink, createSharedInstacartLink } from '../api/client'
+import { useFeatures } from '../context/FeaturesContext'
 
 type ShopInstacartButtonProps =
   | { recipeId: string; shareSlug?: undefined; className?: string }
@@ -10,13 +10,9 @@ export function ShopInstacartButton({ className = '', ...props }: ShopInstacartB
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const { data: features } = useQuery({
-    queryKey: ['features'],
-    queryFn: getFeatures,
-    staleTime: 60_000,
-  })
+  const features = useFeatures()
 
-  if (!features?.instacart_shopping) {
+  if (!features.instacart_shopping) {
     return null
   }
 

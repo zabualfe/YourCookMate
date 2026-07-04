@@ -50,6 +50,11 @@ def analyze_frames_for_recipe(frames: list[Path], *, max_frames: Optional[int] =
     if not settings.openai_api_key or not frames:
         return None
 
+    from app.services.feature_flags import ai_allowed
+
+    if not ai_allowed():
+        return None
+
     selected = frames[: max_frames or settings.social_vision_max_frames]
     if not selected:
         return None

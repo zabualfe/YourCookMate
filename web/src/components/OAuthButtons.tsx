@@ -1,6 +1,7 @@
 import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useFeatures } from '../context/FeaturesContext'
 import { loginWithApple, loginWithGoogle } from '../api/client'
 import { postAuthPath } from '../lib/authRedirect'
 import { useState } from 'react'
@@ -113,6 +114,9 @@ function AppleButton({ onError, redirect = '/recipes' }: OAuthButtonsProps) {
 }
 
 export function OAuthButtons({ onError, redirect = '/recipes' }: OAuthButtonsProps) {
+  const features = useFeatures()
+  if (!features.auth) return null
+
   const showDivider = googleClientId || appleClientId
 
   if (!showDivider) return null

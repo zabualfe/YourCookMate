@@ -3,26 +3,22 @@ import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   disconnectInstacart,
-  getFeatures,
   getInstacartConnectStatus,
   startInstacartConnect,
 } from '../api/client'
+import { useFeatures } from '../context/FeaturesContext'
 
 export function InstacartConnectCard() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [banner, setBanner] = useState<string | null>(null)
 
-  const { data: features } = useQuery({
-    queryKey: ['features'],
-    queryFn: getFeatures,
-    staleTime: 60_000,
-  })
+  const features = useFeatures()
 
   const { data, isLoading } = useQuery({
     queryKey: ['instacart-connect'],
     queryFn: getInstacartConnectStatus,
-    enabled: !!features?.instacart,
+    enabled: features.instacart,
   })
 
   useEffect(() => {

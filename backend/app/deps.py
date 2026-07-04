@@ -53,3 +53,11 @@ def require_verified_email(user: User = Depends(get_current_user)) -> User:
             detail="Verify your email before saving recipes. Check your inbox or resend the link from your profile.",
         )
     return user
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    from app.services.admin import is_admin_user
+
+    if not is_admin_user(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return user

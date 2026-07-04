@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
+import { getAdminStatus } from '../api/client'
 
 function firstName(user: { display_name?: string | null; email: string }) {
   if (user.display_name?.trim()) {
@@ -24,6 +26,11 @@ export function UserMenu() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const { data: adminStatus } = useQuery({
+    queryKey: ['admin-status'],
+    queryFn: getAdminStatus,
+  })
 
   useEffect(() => {
     if (!open) return
@@ -103,6 +110,16 @@ export function UserMenu() {
           >
             Profile
           </Link>
+          {adminStatus?.is_admin && (
+            <Link
+              to="/admin"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block px-4 py-2.5 text-sm text-stone-700 transition hover:bg-stone-50"
+            >
+              Admin
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
+import { useFeatures } from '../context/FeaturesContext'
 import { listCollections } from '../api/client'
 
 function navClass({ isActive }: { isActive: boolean }) {
@@ -15,6 +16,7 @@ function navClass({ isActive }: { isActive: boolean }) {
 
 export function SidebarNav() {
   const { isAuthenticated } = useAuth()
+  const features = useFeatures()
   const location = useLocation()
   const onCollectionsRoute = location.pathname.startsWith('/collections')
   const [collectionsOpen, setCollectionsOpen] = useState(onCollectionsRoute)
@@ -86,29 +88,33 @@ export function SidebarNav() {
                       Manage collections
                     </Link>
                   </>
-                ) : (
+                ) : features.auth ? (
                   <Link
                     to="/login?redirect=/collections"
                     className="block px-2 py-1.5 text-sm text-stone-500 hover:text-brand-600"
                   >
                     Sign in to view
                   </Link>
+                ) : (
+                  <p className="px-2 py-1.5 text-xs text-stone-400">Sign-in disabled</p>
                 )}
               </div>
             )}
           </div>
 
-          <NavLink to="/community" className={navClass}>
-            <UsersIcon />
-            Community Recipes
-          </NavLink>
+          {features.community && (
+            <NavLink to="/community" className={navClass}>
+              <UsersIcon />
+              Community Recipes
+            </NavLink>
+          )}
         </nav>
       </aside>
 
       <nav className="flex gap-1 overflow-x-auto border-b border-stone-200 bg-white px-3 py-2 md:hidden">
         <MobileNavLink to="/recipes">My Recipes</MobileNavLink>
         <MobileNavLink to="/collections">Collections</MobileNavLink>
-        <MobileNavLink to="/community">Community</MobileNavLink>
+        {features.community && <MobileNavLink to="/community">Community</MobileNavLink>}
       </nav>
     </>
   )

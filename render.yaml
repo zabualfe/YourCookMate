@@ -58,6 +58,20 @@ services:
         value: "false"
       - key: INSTACART_ENABLED
         value: "false"
+      - key: ADMIN_EMAILS
+        value: zabualfe@gmail.com
+      - key: FEATURE_AUTH
+        sync: false
+      - key: FEATURE_REGISTRATION
+        sync: false
+      - key: FEATURE_AI
+        sync: false
+      - key: FEATURE_SOCIAL_INGEST
+        sync: false
+      - key: FEATURE_COMMUNITY
+        sync: false
+      - key: FEATURE_INSTACART
+        sync: false
       - key: YTDLP_COOKIES
         sync: false
       - key: YTDLP_COOKIES_FILE

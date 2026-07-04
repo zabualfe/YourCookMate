@@ -74,7 +74,15 @@ def _migrate_schema() -> None:
 
 
 def init_db() -> None:
-    from app.models import collection, email_verification_token, oauth_account, recipe, user  # noqa: F401
+    from app.models import collection, email_verification_token, feature_flag, oauth_account, recipe, user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _migrate_schema()
+
+    from app.services.feature_flag_store import seed_feature_flags
+
+    db = SessionLocal()
+    try:
+        seed_feature_flags(db)
+    finally:
+        db.close()

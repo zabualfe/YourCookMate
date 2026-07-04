@@ -116,13 +116,51 @@ export async function fetchMe(): Promise<User> {
 }
 
 export interface AppFeatures {
+  auth: boolean
+  registration: boolean
+  ai: boolean
+  social_ingest: boolean
+  community: boolean
   instacart: boolean
   instacart_shopping: boolean
   instacart_connect: boolean
 }
 
 export async function getFeatures(): Promise<AppFeatures> {
-  return request('/features')
+  const res = await fetch('/api/features', { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error('Failed to load feature flags')
+  }
+  return res.json() as Promise<AppFeatures>
+}
+
+export interface AdminFeatureFlag {
+  key: string
+  enabled: boolean
+  label: string
+  description: string
+}
+
+export interface AdminFeatureFlagsResponse {
+  flags: AdminFeatureFlag[]
+  updated_at?: string | null
+}
+
+export async function getAdminStatus(): Promise<{ is_admin: boolean }> {
+  return request('/admin/status')
+}
+
+export async function getAdminFeatureFlags(): Promise<AdminFeatureFlagsResponse> {
+  return request('/admin/feature-flags')
+}
+
+export async function updateAdminFeatureFlags(
+  flags: Record<string, boolean>,
+): Promise<AppFeatures> {
+  return request('/admin/feature-flags', {
+    method: 'PUT',
+    body: JSON.stringify(flags),
+  })
 }
 
 export interface InstacartConnectStatus {

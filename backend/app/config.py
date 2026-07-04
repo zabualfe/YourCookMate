@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from pydantic import field_validator
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -54,6 +55,30 @@ class Settings(BaseSettings):
     max_icon_bytes: int = 2 * 1024 * 1024
 
     instacart_enabled: bool = False
+    feature_auth_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_AUTH", "FEATURE_AUTH_ENABLED"),
+    )
+    feature_registration_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_REGISTRATION", "FEATURE_REGISTRATION_ENABLED"),
+    )
+    feature_ai_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_AI", "FEATURE_AI_ENABLED"),
+    )
+    feature_social_ingest_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_SOCIAL_INGEST", "FEATURE_SOCIAL_INGEST_ENABLED"),
+    )
+    feature_community_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_COMMUNITY", "FEATURE_COMMUNITY_ENABLED"),
+    )
+    feature_instacart_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_INSTACART", "FEATURE_INSTACART_ENABLED"),
+    )
     instacart_api_key: Optional[str] = None
     instacart_api_base: str = "https://connect.dev.instacart.tools"
     instacart_link_expires_days: int = 30
@@ -63,6 +88,8 @@ class Settings(BaseSettings):
     instacart_connect_client_secret: Optional[str] = None
     instacart_connect_api_base: str = "https://connect.dev.instacart.tools"
     instacart_connect_authorize_url: Optional[str] = None
+
+    admin_emails: str = "zabualfe@gmail.com"
 
     @field_validator(
         "openai_api_key",

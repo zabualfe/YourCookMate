@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useFeatures } from '../context/FeaturesContext'
 import { UserMenu } from './UserMenu'
 import { SidebarNav } from './SidebarNav'
 
@@ -23,6 +24,7 @@ function shouldShowSidebar(pathname: string, hideNav?: boolean, override?: boole
 
 export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
   const { isAuthenticated, loading, user } = useAuth()
+  const features = useFeatures()
   const { pathname } = useLocation()
   const sidebarVisible = shouldShowSidebar(pathname, hideNav, showSidebar)
 
@@ -59,6 +61,7 @@ export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
                 </Link>
 
                 {!loading &&
+                  features.auth &&
                   (isAuthenticated ? (
                     <div className="ml-1 border-l border-stone-200 pl-2 sm:ml-2 sm:pl-3">
                       <UserMenu />

@@ -10,6 +10,7 @@ import httpx
 from fastapi import HTTPException, status
 
 from app.config import settings
+from app.services.feature_flags import ai_allowed
 from app.services.video_cache import (
     ensure_video_cached,
     get_cached_frames,
@@ -236,7 +237,7 @@ def _description_from_info(info: dict) -> str:
 
 
 def _transcribe_audio(url: str) -> Optional[str]:
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not ai_allowed():
         return None
 
     try:
@@ -390,8 +391,8 @@ def _run_audio_step(
         transcript = _transcribe_audio(source_url)
     if transcript:
         notes.append("Added spoken audio transcript.")
-    elif not settings.openai_api_key:
-        notes.append("Audio transcription skipped (OPENAI_API_KEY not set).")
+    elif not settings.openai_api_key or not ai_allowed():
+        notes.append("Audio transcription skipped (AI disabled or OPENAI_API_KEY not set).")
     else:
         notes.append(
             "No speech detected, could not transcribe audio, or OPENAI_API_KEY is invalid on the server."
@@ -422,8 +423,8 @@ def _run_visual_step(
             visual_text = None
     if visual_text:
         notes.append("Added visual analysis from the video (text overlays and actions).")
-    elif not settings.openai_api_key:
-        notes.append("Video analysis skipped (OPENAI_API_KEY not set).")
+    elif not settings.openai_api_key or not ai_allowed():
+        notes.append("Video analysis skipped (AI disabled or OPENAI_API_KEY not set).")
     else:
         notes.append("Could not analyze video frames — paste the caption manually if needed.")
     return visual_text

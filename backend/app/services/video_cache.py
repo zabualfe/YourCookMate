@@ -135,6 +135,11 @@ def transcribe_cached_video(video_path: Path) -> Optional[str]:
     if not settings.openai_api_key:
         return None
 
+    from app.services.feature_flags import ai_allowed
+
+    if not ai_allowed():
+        return None
+
     try:
         from openai import OpenAI
     except ImportError:

@@ -1,10 +1,23 @@
 from app.config import settings
 from app.main import features
+from app.services import feature_flags as ff
 from app.services.instacart import instacart_shopping_available
 from app.services.instacart_connect import connect_is_configured
 
 
-def test_features_all_off_by_default(monkeypatch):
+def test_features_instacart_off_by_default(monkeypatch):
+    monkeypatch.setattr(
+        ff,
+        "get_flag_values",
+        lambda **kwargs: {
+            "auth": True,
+            "registration": True,
+            "ai": True,
+            "social_ingest": True,
+            "community": True,
+            "instacart": False,
+        },
+    )
     monkeypatch.setattr(settings, "instacart_enabled", False)
     monkeypatch.setattr(settings, "instacart_api_key", None)
     monkeypatch.setattr(settings, "instacart_connect_client_id", None)
@@ -18,6 +31,18 @@ def test_features_all_off_by_default(monkeypatch):
 
 
 def test_features_shopping_when_enabled_with_key(monkeypatch):
+    monkeypatch.setattr(
+        ff,
+        "get_flag_values",
+        lambda **kwargs: {
+            "auth": True,
+            "registration": True,
+            "ai": True,
+            "social_ingest": True,
+            "community": True,
+            "instacart": True,
+        },
+    )
     monkeypatch.setattr(settings, "instacart_enabled", True)
     monkeypatch.setattr(settings, "instacart_api_key", "keys.test")
     assert instacart_shopping_available() is True

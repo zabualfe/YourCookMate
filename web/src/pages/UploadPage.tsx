@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
+import { useFeatures } from '../context/FeaturesContext'
 import { ingestSocialLink, parseRecipe } from '../api/client'
 import type { IngestLinkResponse } from '../types/ingest'
 import { videoPlatformLabel } from '../types/ingest'
@@ -26,6 +27,7 @@ Instructions:
 type Tab = 'text' | 'link'
 
 export function UploadPage() {
+  const features = useFeatures()
   const [tab, setTab] = useState<Tab>('text')
   const [text, setText] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
@@ -85,8 +87,15 @@ export function UploadPage() {
       <div className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="text-2xl font-bold text-stone-900">Add a recipe</h1>
         <p className="mt-1 text-stone-600">
-          Paste text or import from a video link — Instagram reels, TikTok, YouTube, and more.
+          Paste text{features.social_ingest ? ' or import from a video link' : ''} — Instagram reels, TikTok,
+          YouTube, and more.
         </p>
+
+        {!features.ai && (
+          <p className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            AI parsing is off — recipes use basic text splitting only.
+          </p>
+        )}
 
         <div className="mt-6 flex gap-1 rounded-xl bg-stone-100 p-1">
           <button
@@ -102,16 +111,18 @@ export function UploadPage() {
           >
             Paste text
           </button>
-          <button
-            type="button"
-            onClick={() => setTab('link')}
-            className={[
-              'flex-1 rounded-lg py-2.5 text-sm font-medium transition',
-              tab === 'link' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:text-stone-800',
-            ].join(' ')}
-          >
-            Video link
-          </button>
+          {features.social_ingest && (
+            <button
+              type="button"
+              onClick={() => setTab('link')}
+              className={[
+                'flex-1 rounded-lg py-2.5 text-sm font-medium transition',
+                tab === 'link' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:text-stone-800',
+              ].join(' ')}
+            >
+              Video link
+            </button>
+          )}
         </div>
 
         {tab === 'text' ? (

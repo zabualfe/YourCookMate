@@ -11,7 +11,7 @@ from app.models.recipe import Recipe
 from app.models.user import User
 from app.routers.share import _author_name
 from app.schemas.share import CommunityRecipeListResponse, CommunityRecipeSummary
-from app.services.recipe_icons import icon_public_url
+from app.services.feature_flags import require_community_enabled
 
 router = APIRouter(prefix="/community", tags=["community"])
 
@@ -22,6 +22,7 @@ def list_community_recipes(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_optional_user),
 ) -> CommunityRecipeListResponse:
+    require_community_enabled()
     query = (
         db.query(Recipe)
         .options(joinedload(Recipe.user))

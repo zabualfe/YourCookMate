@@ -30,7 +30,7 @@ from app.services.auth import (
 from app.services.email import send_verification_email
 from app.services.oauth_apple import AppleAuthError, verify_apple_identity_token
 from app.services.oauth_google import GoogleAuthError, verify_google_id_token
-from app.services.verification import create_verification_token, verify_email_token
+from app.services.feature_flags import require_auth_enabled, require_registration_enabled
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -56,6 +56,7 @@ def _send_verification(db: Session, user: User) -> tuple[str, bool]:
 
 @router.post("/register", response_model=AuthResponse)
 def register(body: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    require_registration_enabled()
     if get_user_by_email(db, body.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
@@ -68,6 +69,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> AuthRespon
 
 @router.post("/login", response_model=AuthResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    require_auth_enabled()
     user = get_user_by_email(db, body.email)
     if user is None or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
@@ -101,6 +103,7 @@ def google_mobile_callback(
 
 @router.post("/google", response_model=AuthResponse)
 def google_auth(body: OAuthTokenRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    require_auth_enabled()
     try:
         profile = verify_google_id_token(body.id_token)
     except GoogleAuthError as exc:
@@ -111,6 +114,7 @@ def google_auth(body: OAuthTokenRequest, db: Session = Depends(get_db)) -> AuthR
 
 @router.post("/apple", response_model=AuthResponse)
 def apple_auth(body: OAuthTokenRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    require_auth_enabled()
     try:
         profile = verify_apple_identity_token(body.id_token)
     except AppleAuthError as exc:
