@@ -120,8 +120,12 @@ The API is configured via [`render.yaml`](./render.yaml) at the repo root.
    | `SMTP_FROM` | Verified sender in Resend |
 
 4. After deploy, confirm **https://yourcookmate-api.onrender.com/health** returns `{"status":"ok"}`.
-5. In **Vercel** (web project), set `VITE_API_URL` to the Render URL and redeploy.
-6. In **Google Cloud Console**, add authorized origins/redirect URIs for production:
+5. **Auto-deploy on push to `main`** (after backend tests pass):
+   - Render → **yourcookmate-api** → **Settings** → **Deploy Hook** → copy URL
+   - GitHub → **Settings** → **Secrets and variables** → **Actions** → add `RENDER_DEPLOY_HOOK_URL`
+   - In Render **Settings**, set **Auto-Deploy** to **Off** (CI triggers deploys via the hook)
+6. In **Vercel** (web project), set `VITE_API_URL` to the Render URL and redeploy.
+7. In **Google Cloud Console**, add authorized origins/redirect URIs for production:
    - Web origin: your Vercel URL
    - API callback: `https://yourcookmate-api.onrender.com/auth/google/mobile/callback`
 

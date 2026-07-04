@@ -1,11 +1,11 @@
 name: CI
 
 # Web deploys to Vercel on push to main after tests + build pass.
-# Deploy uses `vercel deploy --prod` (remote build on Vercel) so production
-# env vars like VITE_API_URL are applied and CI does not need a local vite binary.
+# API deploys to Render via deploy hook after backend tests pass.
 #
 # GitHub secrets (Settings → Secrets and variables → Actions):
 #   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+#   RENDER_DEPLOY_HOOK_URL — Render → yourcookmate-api → Settings → Deploy Hook
 #
 # Vercel project (Root Directory = web) env vars:
 #   VITE_API_URL — production API URL
@@ -65,7 +65,7 @@ jobs:
       - name: Build
         run: npm run build
 
-  deploy:
+  deploy-vercel:
     name: Deploy to Vercel (production)
     needs: [backend, web]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -98,3 +98,17 @@ jobs:
           url=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Deployed to $url"
+
+  deploy-render:
+    name: Deploy to Render (production)
+    needs: [backend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: production-api
+      url: https://yourcookmate-api.onrender.com
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK_URL }}?ref=${{ github.sha }}"
+          echo "Triggered Render deploy for commit ${{ github.sha }}"

@@ -18,7 +18,8 @@ services:
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
-    autoDeploy: true
+    # CI triggers deploys via RENDER_DEPLOY_HOOK_URL after backend tests pass (see .github/workflows/ci.yml).
+    autoDeploy: false
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.0"
