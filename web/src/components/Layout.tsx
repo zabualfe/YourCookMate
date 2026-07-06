@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useFeatures } from '../context/FeaturesContext'
+import { BrandLogo } from './BrandLogo'
 import { UserMenu } from './UserMenu'
 import { SidebarNav } from './SidebarNav'
 
@@ -29,7 +30,7 @@ export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
   const sidebarVisible = shouldShowSidebar(pathname, hideNav, showSidebar)
 
   return (
-    <div className="min-h-dvh flex flex-col bg-stone-50">
+    <div className="min-h-dvh flex flex-col bg-surface">
       {!hideNav && (
         <>
           {user && !user.email_verified && (
@@ -44,12 +45,9 @@ export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
             <div className="flex h-14 w-full items-center justify-between gap-4 px-5 sm:px-8">
               <Link
                 to="/"
-                className="flex shrink-0 items-center gap-2.5 font-semibold text-stone-900 transition hover:opacity-80"
+                className="flex shrink-0 items-center font-semibold text-stone-900 transition hover:opacity-80"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-sm font-bold text-white shadow-sm shadow-brand-600/20">
-                  YC
-                </span>
-                <span className="text-base tracking-tight">Your Cook Mate</span>
+                <BrandLogo />
               </Link>
 
               <nav className="flex items-center gap-1 sm:gap-2">

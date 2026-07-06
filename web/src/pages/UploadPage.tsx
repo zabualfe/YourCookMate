@@ -3,94 +3,160 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { useFeatures } from '../context/FeaturesContext'
-import { ingestSocialLink, ingestUsesAws } from '../api/ingest'
+import { ingestSocialLink } from '../api/ingest'
 import { parseRecipe } from '../api/client'
 import { VideoLinkPreview } from '../components/VideoLinkPreview'
+import { RecipeCreateProgress } from '../components/RecipeCreateProgress'
 import type { IngestLinkResponse } from '../types/ingest'
 import { videoPlatformLabel } from '../types/ingest'
 
-const SAMPLE = `Classic Tomato Pasta
+type CreateResult =
+  | { status: 'done'; ingested: IngestLinkResponse; rawText: string; parsed: Awaited<ReturnType<typeof parseRecipe>> }
+  | { status: 'needs_edit'; ingested: IngestLinkResponse; rawText: string; message: string }
 
-Ingredients:
-- 12 oz spaghetti
-- 2 tbsp olive oil
-- 3 cloves garlic, minced
-- 1 can (28 oz) crushed tomatoes
-- 1 tsp dried oregano
-- Salt and pepper to taste
-- Fresh basil for garnish
-
-Instructions:
-1. Bring a large pot of salted water to a boil. Cook spaghetti according to package directions until al dente. Reserve 1 cup pasta water, then drain.
-2. While pasta cooks, heat olive oil in a large skillet over medium heat. Add garlic and sauté 30 seconds until fragrant.
-3. Add crushed tomatoes and oregano. Simmer 10 minutes, stirring occasionally. Season with salt and pepper.
-4. Add drained pasta to the sauce. Toss, adding pasta water as needed until silky. Serve topped with fresh basil.`
-
-type Tab = 'text' | 'link'
+function saveReviewAndGo(
+  navigate: ReturnType<typeof useNavigate>,
+  rawText: string,
+  parsed: Awaited<ReturnType<typeof parseRecipe>>,
+  ingested: IngestLinkResponse,
+) {
+  sessionStorage.setItem(
+    'yourcookmate_review',
+    JSON.stringify({
+      rawText,
+      recipe: parsed.recipe,
+      usedAi: parsed.used_ai,
+      sourceType: ingested.source_type,
+      sourceUrl: ingested.source_url,
+    }),
+  )
+  navigate('/new/review')
+}
 
 export function UploadPage() {
   const features = useFeatures()
-  const [tab, setTab] = useState<Tab>('text')
   const [text, setText] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [manualCaption, setManualCaption] = useState('')
   const [extracted, setExtracted] = useState<IngestLinkResponse | null>(null)
+  const [editMessage, setEditMessage] = useState<string | null>(null)
+  const [progressStep, setProgressStep] = useState<number | null>(null)
+  const [progressSession, setProgressSession] = useState(0)
   const navigate = useNavigate()
 
-  const parseMutation = useMutation({
-    mutationFn: (rawText: string) =>
-      parseRecipe({
-        raw_text: rawText,
-        source_url: extracted?.source_url,
-        video_duration: extracted?.video_duration ?? undefined,
-      }),
-    onSuccess: (data, rawText) => {
-      sessionStorage.setItem(
-        'yourcookmate_review',
-        JSON.stringify({
-          rawText,
-          recipe: data.recipe,
-          usedAi: data.used_ai,
-          sourceType: extracted?.source_type,
-          sourceUrl: extracted?.source_url,
-        }),
-      )
-      navigate('/new/review')
-    },
-  })
-
-  const ingestMutation = useMutation({
-    mutationFn: () =>
-      ingestSocialLink({
+  const createRecipeMutation = useMutation({
+    mutationFn: async (): Promise<CreateResult> => {
+      setProgressStep(0)
+      const ingested = await ingestSocialLink({
         url: linkUrl.trim(),
         caption: manualCaption.trim() || undefined,
-      }),
-    onSuccess: (data) => {
-      setExtracted(data)
-      setText(data.raw_text)
+      })
+      setProgressStep(1)
+      const rawText = ingested.raw_text.trim()
+      if (rawText.length < 10) {
+        return {
+          status: 'needs_edit',
+          ingested,
+          rawText,
+          message:
+            'We could not find enough recipe text in that link. Add the caption from the post and try again.',
+        }
+      }
+      setProgressStep(2)
+      try {
+        const parsed = await parseRecipe({
+          raw_text: rawText,
+          source_url: ingested.source_url,
+          video_duration: ingested.video_duration ?? undefined,
+        })
+        return { status: 'done', ingested, rawText, parsed }
+      } catch {
+        return {
+          status: 'needs_edit',
+          ingested,
+          rawText,
+          message:
+            'We found the recipe but had trouble breaking it into steps. Edit the text below and try again.',
+        }
+      }
     },
+    onMutate: () => {
+      setProgressStep(0)
+      setProgressSession((s) => s + 1)
+    },
+    onSuccess: (result) => {
+      if (result.status === 'done') {
+        saveReviewAndGo(navigate, result.rawText, result.parsed, result.ingested)
+        return
+      }
+      setExtracted(result.ingested)
+      setText(result.rawText)
+      setEditMessage(result.message)
+    },
+    onSettled: () => setProgressStep(null),
   })
 
-  const activeText = tab === 'link' && extracted ? text : text
-  const canParse = activeText.trim().length >= 10 && !parseMutation.isPending
+  const retryParseMutation = useMutation({
+    mutationFn: async () => {
+      if (!extracted) throw new Error('Nothing to build yet.')
+      setProgressStep(0)
+      const rawText = text.trim()
+      if (rawText.length < 10) {
+        throw new Error('Recipe text is too short. Add more detail or paste the caption and try again.')
+      }
+      return parseRecipe({
+        raw_text: rawText,
+        source_url: extracted.source_url,
+        video_duration: extracted.video_duration ?? undefined,
+      })
+    },
+    onSuccess: (parsed) => {
+      if (!extracted) return
+      saveReviewAndGo(navigate, text.trim(), parsed, extracted)
+    },
+    onMutate: () => {
+      setProgressStep(0)
+      setProgressSession((s) => s + 1)
+    },
+    onSettled: () => setProgressStep(null),
+  })
 
-  const handleParse = () => {
-    parseMutation.mutate(activeText.trim())
-  }
+  const isBusy = createRecipeMutation.isPending || retryParseMutation.isPending
+  const canSubmit = linkUrl.trim().length >= 10 && !isBusy
+  const showEditPanel = extracted !== null
 
   const resetLinkFlow = () => {
     setExtracted(null)
     setText('')
-    setManualCaption('')
+    setEditMessage(null)
+    setProgressStep(null)
+    createRecipeMutation.reset()
+    retryParseMutation.reset()
   }
+
+  if (!features.social_ingest) {
+    return (
+      <Layout>
+        <div className="mx-auto max-w-3xl px-4 py-8">
+          <h1 className="text-2xl font-bold text-stone-900">Add a recipe</h1>
+          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Adding recipes from links is currently unavailable. Please try again later.
+          </p>
+        </div>
+      </Layout>
+    )
+  }
+
+  const linkError = createRecipeMutation.error as Error | null
+  const parseError = retryParseMutation.error as Error | null
 
   return (
     <Layout>
       <div className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="text-2xl font-bold text-stone-900">Add a recipe</h1>
         <p className="mt-1 text-stone-600">
-          Paste text{features.social_ingest ? ' or import from a video link' : ''} — Instagram reels, TikTok,
-          YouTube, and more.
+          Paste a link to any cooking video or recipe page — we&apos;ll read it and break it into
+          easy step-by-step cards.
         </p>
 
         {!features.ai && (
@@ -99,196 +165,141 @@ export function UploadPage() {
           </p>
         )}
 
-        <div className="mt-6 flex gap-1 rounded-xl bg-stone-100 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setTab('text')
-              setExtracted(null)
-            }}
-            className={[
-              'flex-1 rounded-lg py-2.5 text-sm font-medium transition',
-              tab === 'text' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:text-stone-800',
-            ].join(' ')}
-          >
-            Paste text
-          </button>
-          {features.social_ingest && (
+        <div className="mt-6 space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium text-stone-700">Recipe or video link</span>
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => {
+                setLinkUrl(e.target.value)
+                if (extracted) resetLinkFlow()
+              }}
+              placeholder="TikTok, YouTube, Instagram, or any recipe website…"
+              className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+            />
+          </label>
+
+          {linkUrl.trim().length >= 10 && <VideoLinkPreview url={linkUrl} />}
+
+          <label className="block">
+            <span className="text-sm font-medium text-stone-700">
+              Caption from the post{' '}
+              <span className="font-normal text-stone-400">(optional — only if the link doesn&apos;t work)</span>
+            </span>
+            <textarea
+              value={manualCaption}
+              onChange={(e) => setManualCaption(e.target.value)}
+              placeholder="Copy and paste the video caption here if we can't read the link automatically…"
+              rows={4}
+              className="mt-1 w-full resize-y rounded-xl border border-stone-200 bg-white p-3 text-sm leading-relaxed text-stone-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+            />
+          </label>
+
+          {!showEditPanel && (
             <button
               type="button"
-              onClick={() => setTab('link')}
-              className={[
-                'flex-1 rounded-lg py-2.5 text-sm font-medium transition',
-                tab === 'link' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:text-stone-800',
-              ].join(' ')}
+              disabled={!canSubmit}
+              onClick={() => createRecipeMutation.mutate()}
+              className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-brand-600 text-base font-semibold text-white transition enabled:hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-10"
             >
-              Video link
+              Create step-by-step recipe
             </button>
+          )}
+
+          {createRecipeMutation.isPending && progressStep !== null && (
+            <RecipeCreateProgress key={`create-${progressSession}`} step={progressStep} mode="full" />
+          )}
+
+          {retryParseMutation.isPending && progressStep !== null && (
+            <RecipeCreateProgress key={`retry-${progressSession}`} step={progressStep} mode="parse-only" />
+          )}
+
+          {linkError && (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              <p>{linkError.message || 'Something went wrong. Is the backend running?'}</p>
+              {linkError.message.includes('caption') && (
+                <p className="mt-2 text-red-600/90">
+                  Open the post, copy the caption, paste it in the field above, then try again.
+                </p>
+              )}
+            </div>
+          )}
+
+          {showEditPanel && extracted && (
+            <div className="rounded-2xl border border-brand-200 bg-brand-50/40 p-4">
+              {editMessage && (
+                <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {editMessage}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-start gap-4">
+                {extracted.thumbnail_url && (
+                  <img
+                    src={extracted.thumbnail_url}
+                    alt=""
+                    className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-stone-900">
+                    Found on {videoPlatformLabel(extracted.source_type)}
+                  </p>
+                  {extracted.title && (
+                    <p className="mt-0.5 truncate text-sm text-stone-600">{extracted.title}</p>
+                  )}
+                  {extracted.author && (
+                    <p className="text-xs text-stone-500">by {extracted.author}</p>
+                  )}
+                  {extracted.extraction_notes.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 text-xs text-stone-600">
+                      {extracted.extraction_notes.map((note) => (
+                        <li key={note}>• {note}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <label className="mt-4 block">
+                <span className="text-sm font-medium text-stone-700">
+                  Recipe text — edit anything that looks wrong
+                </span>
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  rows={12}
+                  className="mt-1 w-full resize-y rounded-xl border border-stone-200 bg-white p-3 text-sm leading-relaxed text-stone-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+                />
+              </label>
+
+              <p className="mt-2 text-xs text-stone-500">
+                {text.length.toLocaleString()} characters · confidence{' '}
+                {Math.round(extracted.confidence * 100)}%
+              </p>
+
+              {parseError && (
+                <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {parseError.message}
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={text.trim().length < 10 || retryParseMutation.isPending}
+                onClick={() => retryParseMutation.mutate()}
+                className="mt-4 flex min-h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-brand-600 text-base font-semibold text-white transition enabled:hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-10"
+              >
+                Create step-by-step recipe
+              </button>
+            </div>
           )}
         </div>
 
-        {tab === 'text' ? (
-          <>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Paste your full recipe here — title, ingredients, and instructions..."
-              rows={16}
-              className="mt-6 w-full resize-y rounded-2xl border border-stone-200 bg-white p-4 text-base leading-relaxed text-stone-800 shadow-sm outline-none ring-brand-500/0 transition focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-            />
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setText(SAMPLE)}
-                className="text-sm font-medium text-brand-600 hover:text-brand-700"
-              >
-                Try sample recipe
-              </button>
-              <span className="text-stone-300">|</span>
-              <span className="text-sm text-stone-400">{text.length.toLocaleString()} characters</span>
-            </div>
-          </>
-        ) : (
-          <div className="mt-6 space-y-4">
-            <label className="block">
-              <span className="text-sm font-medium text-stone-700">Video URL</span>
-              <input
-                type="url"
-                value={linkUrl}
-                onChange={(e) => {
-                  setLinkUrl(e.target.value)
-                  if (extracted) resetLinkFlow()
-                }}
-                placeholder="Instagram reel, TikTok, YouTube, Facebook, Pinterest, or any public video URL…"
-                className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </label>
-
-            {linkUrl.trim().length >= 10 && <VideoLinkPreview url={linkUrl} />}
-
-            <label className="block">
-              <span className="text-sm font-medium text-stone-700">
-                Caption <span className="font-normal text-stone-400">(optional — use if import fails)</span>
-              </span>
-              <textarea
-                value={manualCaption}
-                onChange={(e) => setManualCaption(e.target.value)}
-                placeholder="Paste the caption here if the link can't be fetched automatically…"
-                rows={4}
-                className="mt-1 w-full resize-y rounded-xl border border-stone-200 bg-white p-3 text-sm leading-relaxed text-stone-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </label>
-
-            <button
-              type="button"
-              disabled={linkUrl.trim().length < 10 || ingestMutation.isPending}
-              onClick={() => ingestMutation.mutate()}
-              className="rounded-xl border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-800 transition enabled:hover:bg-stone-50 disabled:opacity-50"
-            >
-              {ingestMutation.isPending
-                ? ingestUsesAws()
-                  ? 'Importing via AWS (may take a minute)…'
-                  : 'Importing (may take a minute)…'
-                : 'Import from link'}
-            </button>
-
-            {ingestMutation.isError && (
-              <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-                <p>{(ingestMutation.error as Error).message}</p>
-                {(ingestMutation.error as Error).message.includes('caption') && (
-                  <p className="mt-2 text-red-600/90">
-                    Open the post, copy the caption, paste it into the <strong>Caption</strong> field above,
-                    then click Import again — no server cookies needed.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {extracted && (
-              <div className="rounded-2xl border border-brand-200 bg-brand-50/40 p-4">
-                <div className="flex flex-wrap items-start gap-4">
-                  {extracted.thumbnail_url && (
-                    <img
-                      src={extracted.thumbnail_url}
-                      alt=""
-                      className="h-20 w-20 shrink-0 rounded-xl object-cover"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-stone-900">
-                      Imported from {videoPlatformLabel(extracted.source_type)}
-                    </p>
-                    {extracted.title && (
-                      <p className="mt-0.5 truncate text-sm text-stone-600">{extracted.title}</p>
-                    )}
-                    {extracted.author && (
-                      <p className="text-xs text-stone-500">by {extracted.author}</p>
-                    )}
-                    {extracted.extraction_notes.length > 0 && (
-                      <ul className="mt-2 space-y-0.5 text-xs text-stone-600">
-                        {extracted.extraction_notes.map((note) => (
-                          <li key={note}>• {note}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-
-                <label className="mt-4 block">
-                  <span className="text-sm font-medium text-stone-700">
-                    Extracted text — edit before parsing
-                  </span>
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    rows={12}
-                    className="mt-1 w-full resize-y rounded-xl border border-stone-200 bg-white p-3 text-sm leading-relaxed text-stone-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </label>
-
-                <p className="mt-2 text-xs text-stone-500">
-                  {text.length.toLocaleString()} characters · confidence{' '}
-                  {Math.round(extracted.confidence * 100)}%
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {parseMutation.isError && (
-          <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-            <p>{(parseMutation.error as Error).message || 'Failed to parse recipe. Is the backend running?'}</p>
-            {tab === 'link' && (
-              <p className="mt-2 text-red-600/90">
-                Recipe videos often put instructions in the caption, voiceover, or on-screen text. Open the
-                video, copy the caption into the text box above, edit it, then try parsing again.
-              </p>
-            )}
-          </div>
-        )}
-
-        {tab === 'link' && extracted && extracted.confidence < 0.6 && (
-          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Low-confidence import — the link may not have returned a full recipe. Copy the caption from the
-            video, paste it into the text box below, then parse.
-          </p>
-        )}
-
-        {(tab === 'text' || extracted) && (
-          <button
-            type="button"
-            disabled={!canParse}
-            onClick={handleParse}
-            className="mt-6 flex min-h-12 w-full items-center justify-center rounded-2xl bg-brand-600 text-base font-semibold text-white transition enabled:hover:bg-brand-700 disabled:opacity-50 sm:w-auto sm:px-10"
-          >
-            {parseMutation.isPending ? 'Breaking into steps…' : 'Parse recipe'}
-          </button>
-        )}
-
-        <p className="mt-3 text-xs text-stone-400">
-          Video import reads captions, on-screen text, spoken audio, and video frames on AWS when
-          VITE_AWS_API_URL is set. Instagram/Facebook may need YTDLP_COOKIES on the ingest worker.
+        <p className="mt-6 text-xs text-stone-400">
+          Works with TikTok, YouTube, Instagram, and recipe blogs. May take up to a minute for
+          longer videos.
         </p>
       </div>
     </Layout>

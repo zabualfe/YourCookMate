@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { File, UploadType } from 'expo-file-system'
 import { API_URL } from '@/constants/api'
 import type { AuthResponse, User } from '@/types/auth'
 import type {
@@ -87,13 +88,24 @@ export async function fetchMe(): Promise<User> {
 }
 
 export interface AppFeatures {
+  auth: boolean
+  registration: boolean
+  ai: boolean
+  social_ingest: boolean
+  community: boolean
   instacart: boolean
   instacart_shopping: boolean
   instacart_connect: boolean
+  aws_api_url?: string | null
 }
 
 export async function getFeatures(): Promise<AppFeatures> {
-  return request('/features')
+  const flags = await request<AppFeatures>('/features')
+  const envAws = process.env.EXPO_PUBLIC_AWS_API_URL?.trim().replace(/\/$/, '')
+  return {
+    ...flags,
+    aws_api_url: flags.aws_api_url || envAws || null,
+  }
 }
 
 export interface InstacartConnectStatus {
@@ -219,4 +231,42 @@ export interface InstacartLinkResponse {
 
 export async function createInstacartLink(recipeId: string): Promise<InstacartLinkResponse> {
   return request(`/recipes/${encodeURIComponent(recipeId)}/instacart-link`, { method: 'POST' })
+}
+
+export async function deleteRecipe(id: string): Promise<void> {
+  return request(`/recipes/${id}`, { method: 'DELETE' })
+}
+
+export async function uploadRecipeIcon(
+  id: string,
+  file: { uri: string; name: string; type: string },
+): Promise<RecipeDetailResponse> {
+  const token = await getToken()
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const localFile = new File(file.uri)
+  const result = await localFile.upload(`${API_URL}/recipes/${id}/icon`, {
+    uploadType: UploadType.MULTIPART,
+    fieldName: 'file',
+    mimeType: file.type,
+    headers,
+  })
+
+  if (result.status < 200 || result.status >= 300) {
+    let message = `Request failed (${result.status})`
+    try {
+      const body = JSON.parse(result.body) as { detail?: unknown }
+      if (typeof body.detail === 'string') message = body.detail
+    } catch {
+      // keep default message
+    }
+    throw new Error(message)
+  }
+
+  return JSON.parse(result.body) as RecipeDetailResponse
+}
+
+export async function deleteRecipeIcon(id: string): Promise<RecipeDetailResponse> {
+  return request(`/recipes/${id}/icon`, { method: 'DELETE' })
 }

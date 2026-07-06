@@ -12,5 +12,6 @@ class FeaturesResponse(BaseModel):
     instacart: bool = False
     instacart_shopping: bool = False
     instacart_connect: bool = False
+    aws_api_url: str | None = None
 
     model_config = {"extra": "ignore"}

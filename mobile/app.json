@@ -34,7 +34,15 @@
       "expo-router",
       "expo-web-browser",
       "expo-video",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Your Cook Mate to access your photos to set recipe icons.",
+          "cameraPermission": "Allow Your Cook Mate to use the camera for recipe icons."
+        }
+      ]
     ]
   }
 }

@@ -96,7 +96,7 @@ async def save_recipe_icon(recipe_id: uuid.UUID, upload: UploadFile) -> str:
         )
 
     ext = ALLOWED_ICON_TYPES[content_type]
-    relative = f"recipes/{recipe_id}{ext}"
+    relative = f"recipes/{recipe_id}-{uuid.uuid4().hex[:12]}{ext}"
 
     if _use_s3():
         _s3_client().put_object(

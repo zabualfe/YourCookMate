@@ -10,10 +10,11 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { saveRecipe } from '@/api/client'
 import { StepMediaPreview } from '@/components/StepMediaPreview'
 import { useAuth } from '@/context/AuthContext'
-import { clearReviewDraft, loadReviewDraft } from '@/lib/reviewDraft'
+import { clearReviewDraft, loadReviewDraft, markAddFormForReset } from '@/lib/reviewDraft'
 import type { ReviewDraft } from '@/types/recipe'
 import { videoPlatformLabel } from '@/types/ingest'
 import { colors } from '@/constants/theme'
@@ -21,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons'
 
 export default function ReviewScreen() {
   const { isAuthenticated } = useAuth()
+  const queryClient = useQueryClient()
   const [draft, setDraft] = useState<ReviewDraft | null>(null)
   const [title, setTitle] = useState('')
   const [loading, setLoading] = useState(false)
@@ -63,6 +65,9 @@ export default function ReviewScreen() {
         source_url: draft.sourceUrl,
       })
       await clearReviewDraft()
+      await markAddFormForReset()
+      queryClient.setQueryData(['recipe', saved.id], saved)
+      queryClient.invalidateQueries({ queryKey: ['recipes'] })
       router.replace(destination === 'cook' ? `/cook/${saved.id}` : `/recipes/${saved.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save')

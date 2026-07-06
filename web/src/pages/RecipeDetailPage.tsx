@@ -14,7 +14,7 @@ import { CookwareIcon, PencilIcon } from '../components/icons'
 import { getRecipe as getLocalRecipe, saveRecipe as saveLocalRecipe } from '../lib/storage'
 import { getRecipe as getRecipeApi, updateRecipe } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import type { ParsedRecipe } from '../types/recipe'
+import type { ParsedRecipe, RecipeListResponse } from '../types/recipe'
 
 const metaInputClass =
   'w-16 rounded-lg border border-stone-200 bg-white px-2 py-1 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20'
@@ -48,7 +48,7 @@ export function RecipeDetailPage() {
     } else if (local) {
       setIconUrl(local.iconUrl ?? null)
     }
-  }, [isAuthenticated, data, local])
+  }, [isAuthenticated, data?.id, data?.icon_url, local?.id, local?.iconUrl])
 
   const saveMutation = useMutation({
     mutationFn: (recipe: ParsedRecipe) => updateRecipe(id!, recipe),
@@ -212,9 +212,20 @@ export function RecipeDetailPage() {
                 isLocal={detail.isLocal}
                 onIconChange={(url) => {
                   setIconUrl(url)
-                  if (isAuthenticated && data) {
+                  if (isAuthenticated && data && id) {
                     queryClient.setQueryData(['recipe', id], { ...data, icon_url: url })
-                    queryClient.invalidateQueries({ queryKey: ['recipes'] })
+                    queryClient.setQueriesData<RecipeListResponse>(
+                      { queryKey: ['recipes'] },
+                      (old) => {
+                        if (!old) return old
+                        return {
+                          ...old,
+                          items: old.items.map((item) =>
+                            item.id === id ? { ...item, icon_url: url } : item,
+                          ),
+                        }
+                      },
+                    )
                   } else if (detail.isLocal) {
                     setLocal(getLocalRecipe(detail.id))
                   }

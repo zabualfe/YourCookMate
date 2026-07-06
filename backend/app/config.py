@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     uploads_public_base_url: Optional[str] = None
 
     resend_api_key: Optional[str] = None
+    # AWS API Gateway base (async ingest/parse). Exposed to clients via GET /features.
+    aws_api_url: Optional[str] = None
     # AWS API Gateway email endpoint (same HttpApi as ingest). Preferred on Render.
     email_api_url: Optional[str] = None
     email_api_secret: Optional[str] = None

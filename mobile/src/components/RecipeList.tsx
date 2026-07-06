@@ -1,7 +1,9 @@
-import { Link, router } from 'expo-router'
-import { useState } from 'react'
+import { Ionicons } from '@expo/vector-icons'
+import { router } from 'expo-router'
+import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,24 +11,45 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/context/AuthContext'
-import { listRecipes } from '@/api/client'
-import { colors } from '@/constants/theme'
+import { deleteRecipe, listRecipes } from '@/api/client'
+import { HomeHero } from '@/components/HomeHero'
+import { RecipeIcon } from '@/components/RecipeIcon'
+import { colors, commonStyles, fonts, radii, spacing } from '@/constants/theme'
 
 export function RecipeList() {
   const { isAuthenticated, loading: authLoading } = useAuth()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(id)
+  }, [search])
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['recipes', search],
-    queryFn: () => listRecipes(search || undefined),
+    queryKey: ['recipes', debouncedSearch],
+    queryFn: () => listRecipes(debouncedSearch || undefined),
     enabled: isAuthenticated,
   })
 
+  const removeMutation = useMutation({
+    mutationFn: deleteRecipe,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recipes'] }),
+  })
+
+  const confirmDelete = (id: string) => {
+    Alert.alert('Delete recipe?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => removeMutation.mutate(id) },
+    ])
+  }
+
   if (authLoading) {
     return (
-      <View style={styles.center}>
+      <View style={[commonStyles.screen, styles.center]}>
         <ActivityIndicator color={colors.brand} />
       </View>
     )
@@ -34,98 +57,208 @@ export function RecipeList() {
 
   if (!isAuthenticated) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyTitle}>Sign in to see your recipes</Text>
-        <Link href="/login" asChild>
-          <Pressable style={styles.primaryBtn}>
-            <Text style={styles.primaryBtnText}>Sign in to get started</Text>
-          </Pressable>
-        </Link>
-        <Link href="/register" asChild>
-          <Pressable style={styles.secondaryBtn}>
-            <Text style={styles.secondaryBtnText}>Create an account</Text>
-          </Pressable>
-        </Link>
-      </View>
+      <ScrollView
+        style={commonStyles.screen}
+        contentContainerStyle={styles.guestContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <HomeHero
+          isAuthenticated={false}
+          onPrimaryPress={() => router.push('/register')}
+          onSecondaryPress={() => router.push('/login')}
+        />
+      </ScrollView>
     )
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={commonStyles.screen} contentContainerStyle={styles.authedContent}>
+      <HomeHero
+        isAuthenticated
+        onPrimaryPress={() => router.push('/(tabs)/new')}
+        onSecondaryPress={() => router.push('/login')}
+      />
+
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text style={commonStyles.pageTitle}>My recipes</Text>
+          <Text style={commonStyles.pageSubtitle}>{data?.total ?? 0} saved</Text>
+        </View>
+        <Pressable
+          onPress={() => router.push('/(tabs)/new')}
+          style={styles.addBtn}
+          accessibilityLabel="Add recipe"
+        >
+          <Ionicons name="add" size={18} color={colors.white} />
+          <Text style={styles.addBtnText}>Add</Text>
+        </Pressable>
+      </View>
+
       <TextInput
         value={search}
         onChangeText={setSearch}
         placeholder="Search recipes…"
-        placeholderTextColor={colors.stone500}
-        style={styles.search}
+        placeholderTextColor={colors.stone400}
+        style={[commonStyles.input, { marginTop: spacing.xxl }]}
+        clearButtonMode="while-editing"
       />
 
-      {isLoading && <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />}
+      {isLoading && <Text style={styles.loadingText}>Loading recipes…</Text>}
       {error && (
-        <Text style={styles.error}>{error instanceof Error ? error.message : 'Failed to load'}</Text>
+        <View style={[commonStyles.errorBanner, { marginTop: spacing.xxl }]}>
+          <Text style={commonStyles.errorBannerText}>
+            {error instanceof Error ? error.message : 'Failed to load'}
+          </Text>
+        </View>
+      )}
+
+      {data && data.items.length === 0 && (
+        <View style={commonStyles.emptyState}>
+          <Text style={commonStyles.emptyStateText}>No recipes yet.</Text>
+          <Pressable onPress={() => router.push('/(tabs)/new')}>
+            <Text style={commonStyles.linkText}>Paste your first recipe →</Text>
+          </Pressable>
+        </View>
       )}
 
       {data?.items.map((item) => (
-        <Pressable
-          key={item.id}
-          style={styles.recipeRow}
-          onPress={() => router.push(`/recipes/${item.id}`)}
-        >
-          <Text style={styles.recipeTitle}>{item.title}</Text>
-          <Text style={styles.recipeMeta}>
-            {item.step_count} steps · {new Date(item.created_at).toLocaleDateString()}
-          </Text>
-        </Pressable>
+        <View key={item.id} style={styles.recipeCard}>
+          <RecipeIcon iconUrl={item.icon_url} size="sm" />
+          <Pressable style={styles.recipeBody} onPress={() => router.push(`/recipes/${item.id}`)}>
+            <Text style={styles.recipeTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Text style={styles.recipeMeta}>
+              {item.step_count} steps · {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+          </Pressable>
+          <View style={styles.recipeActions}>
+            <Pressable
+              onPress={() => router.push(`/cook/${item.id}`)}
+              style={styles.cookBtn}
+              accessibilityLabel={`Cook ${item.title}`}
+            >
+              <Text style={styles.cookBtnText}>Cook</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => confirmDelete(item.id)}
+              style={styles.deleteBtn}
+              accessibilityLabel={`Delete ${item.title}`}
+            >
+              <Text style={styles.deleteBtnText}>Delete</Text>
+            </Pressable>
+          </View>
+        </View>
       ))}
-
-      {data && data.items.length === 0 && (
-        <Text style={styles.empty}>No recipes yet. Add one from the Add tab.</Text>
-      )}
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.stone50 },
-  content: { padding: 16, paddingBottom: 40 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  search: {
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xxl,
+  },
+  guestContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.section,
+  },
+  authedContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: 40,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+    marginTop: spacing.xxl,
+  },
+  headerText: { flex: 1 },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.brand600,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+  },
+  addBtnText: {
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 14,
+    color: colors.white,
+  },
+  loadingText: {
+    marginTop: spacing.xxl,
+    fontFamily: fonts.sans,
+    color: colors.stone500,
+  },
+  recipeCard: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     backgroundColor: colors.white,
+    borderRadius: radii.xxl,
     borderWidth: 1,
     borderColor: colors.stone200,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  recipeBody: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    paddingVertical: spacing.xs,
+  },
+  recipeTitle: {
+    fontFamily: fonts.displaySemiBold,
     fontSize: 16,
+    lineHeight: 22,
+    color: colors.stone900,
   },
-  recipeRow: {
-    marginTop: 12,
-    backgroundColor: colors.white,
-    borderRadius: 16,
+  recipeMeta: {
+    marginTop: spacing.xs,
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.stone500,
+  },
+  recipeActions: {
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minWidth: 76,
+    paddingVertical: spacing.xs,
+  },
+  cookBtn: {
+    minHeight: 36,
+    borderRadius: radii.sm,
+    backgroundColor: colors.brand50,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cookBtnText: {
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 14,
+    color: colors.brand700,
+  },
+  deleteBtn: {
+    minHeight: 36,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.stone200,
-    padding: 16,
+    borderColor: '#fecaca',
+    backgroundColor: colors.red50,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  recipeTitle: { fontSize: 16, fontWeight: '600', color: colors.stone900 },
-  recipeMeta: { marginTop: 4, fontSize: 14, color: colors.stone500 },
-  empty: { marginTop: 24, textAlign: 'center', color: colors.stone500 },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.stone900, marginBottom: 4 },
-  error: { marginTop: 16, color: colors.red700, backgroundColor: colors.red50, padding: 12, borderRadius: 12 },
-  primaryBtn: {
-    backgroundColor: colors.brand,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    marginTop: 8,
+  deleteBtnText: {
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 14,
+    color: colors.red700,
   },
-  primaryBtnText: { color: colors.white, fontWeight: '700' },
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: colors.stone200,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    backgroundColor: colors.white,
-  },
-  secondaryBtnText: { color: colors.stone700, fontWeight: '600' },
 })

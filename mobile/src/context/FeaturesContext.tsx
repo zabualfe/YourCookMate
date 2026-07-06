@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getFeatures, type AppFeatures } from '../api/client'
-import { configureAwsIngestBase } from '../api/ingest'
+import { getFeatures, type AppFeatures } from '@/api/client'
+import { configureAwsIngestBase } from '@/api/ingest'
 
 const DEFAULT_FEATURES: AppFeatures = {
   auth: true,

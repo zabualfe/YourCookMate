@@ -37,6 +37,7 @@ export interface RecipeSummary {
   step_count: number
   used_ai: boolean
   created_at: string
+  icon_url?: string | null
 }
 
 export interface RecipeListResponse {
@@ -53,6 +54,7 @@ export interface RecipeDetailResponse {
   used_ai: boolean
   recipe: ParsedRecipe
   created_at: string
+  icon_url?: string | null
 }
 
 export interface ReviewDraft {

@@ -1,8 +1,18 @@
 import type { IngestLinkResponse } from '@/types/ingest'
 
-const AWS_INGEST_BASE = (
-  process.env.EXPO_PUBLIC_AWS_API_URL || process.env.EXPO_PUBLIC_API_URL
-)?.replace(/\/$/, '')
+/** Explicit AWS API Gateway base — do not fall back to EXPO_PUBLIC_API_URL (Render uses sync ingest). */
+const BUILD_TIME_AWS_BASE = process.env.EXPO_PUBLIC_AWS_API_URL?.trim().replace(/\/$/, '')
+
+let runtimeAwsBase: string | undefined = BUILD_TIME_AWS_BASE
+
+export function configureAwsIngestBase(url?: string | null): void {
+  const cleaned = url?.trim().replace(/\/$/, '')
+  runtimeAwsBase = cleaned || BUILD_TIME_AWS_BASE
+}
+
+function getAwsIngestBase(): string | undefined {
+  return runtimeAwsBase
+}
 
 const JOB_POLL_MS = 1000
 const JOB_POLL_MS_MAX = 2000
@@ -25,10 +35,11 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function awsApiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!AWS_INGEST_BASE) {
+  const base = getAwsIngestBase()
+  if (!base) {
     throw new Error('EXPO_PUBLIC_AWS_API_URL is not configured')
   }
-  const res = await fetch(`${AWS_INGEST_BASE}${path}`, {
+  const res = await fetch(`${base}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -63,12 +74,12 @@ async function pollIngestJob(jobId: string): Promise<IngestLinkResponse> {
 }
 
 export function ingestUsesAws(): boolean {
-  return Boolean(AWS_INGEST_BASE)
+  return Boolean(getAwsIngestBase())
 }
 
 export async function fetchLinkPreview(url: string): Promise<import('@/types/ingest').LinkPreviewResponse> {
   const body = { url: url.trim() }
-  if (AWS_INGEST_BASE) {
+  if (getAwsIngestBase()) {
     return awsApiRequest('/ingest/preview', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -82,7 +93,7 @@ export async function ingestSocialLink(payload: {
   url: string
   caption?: string
 }): Promise<IngestLinkResponse> {
-  if (!AWS_INGEST_BASE) {
+  if (!getAwsIngestBase()) {
     const { ingestSocialLinkSync } = await import('./client')
     return ingestSocialLinkSync(payload)
   }

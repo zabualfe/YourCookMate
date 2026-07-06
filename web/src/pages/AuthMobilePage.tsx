@@ -2,6 +2,7 @@ import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
 import { useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import { loginWithGoogle } from '../api/client'
+import { BrandLogo } from '../components/BrandLogo'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 
@@ -48,9 +49,11 @@ export function AuthMobilePage() {
     <GoogleOAuthProvider clientId={googleClientId}>
       <div className="flex min-h-screen flex-col items-center justify-center bg-stone-50 px-6">
         <div className="w-full max-w-sm space-y-6 text-center">
-          <div>
-            <h1 className="text-2xl font-bold text-stone-900">Your Cook Mate</h1>
-            <p className="mt-2 text-stone-600">Sign in with Google to continue in the app.</p>
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <BrandLogo />
+            </div>
+            <p className="text-stone-600">Sign in with Google to continue in the app.</p>
           </div>
 
           {error ? (

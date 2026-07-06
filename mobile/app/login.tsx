@@ -14,8 +14,9 @@ import { login } from '@/api/client'
 import { AppleSignInButton } from '@/components/AppleSignInButton'
 import { GoogleSignInButton } from '@/components/GoogleSignInButton'
 import { OAuthDivider } from '@/components/OAuthDivider'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useAuth } from '@/context/AuthContext'
-import { colors } from '@/constants/theme'
+import { colors, commonStyles, fonts, spacing } from '@/constants/theme'
 
 export default function LoginScreen() {
   const { setSession } = useAuth()
@@ -43,33 +44,48 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <View style={styles.brandWrap}>
+        <BrandLogo />
+      </View>
       <Text style={styles.title}>Sign in</Text>
+      <Text style={styles.subtitle}>Welcome back — let&apos;s get cooking.</Text>
+
       <TextInput
         value={email}
         onChangeText={setEmail}
         placeholder="Email"
+        placeholderTextColor={colors.stone400}
         autoCapitalize="none"
         keyboardType="email-address"
-        style={styles.input}
+        style={commonStyles.input}
       />
       <TextInput
         value={password}
         onChangeText={setPassword}
         placeholder="Password"
+        placeholderTextColor={colors.stone400}
         secureTextEntry
-        style={styles.input}
+        style={[commonStyles.input, { marginTop: spacing.md }]}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={styles.primaryBtn} onPress={handleLogin} disabled={loading}>
+      {error ? (
+        <View style={[commonStyles.errorBanner, { marginTop: spacing.md }]}>
+          <Text style={commonStyles.errorBannerText}>{error}</Text>
+        </View>
+      ) : null}
+      <Pressable
+        style={[commonStyles.primaryBtn, { marginTop: spacing.lg }, loading && { opacity: 0.7 }]}
+        onPress={handleLogin}
+        disabled={loading}
+      >
         {loading ? (
           <ActivityIndicator color={colors.white} />
         ) : (
-          <Text style={styles.primaryBtnText}>Sign in</Text>
+          <Text style={commonStyles.primaryBtnText}>Sign in</Text>
         )}
       </Pressable>
       <OAuthDivider />
       <GoogleSignInButton onError={setError} onSuccess={() => router.back()} />
-      <View style={{ height: 12 }} />
+      <View style={{ height: spacing.md }} />
       <AppleSignInButton onError={setError} onSuccess={() => router.back()} />
       <Link href="/register" asChild>
         <Pressable style={styles.linkBtn}>
@@ -81,27 +97,37 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: colors.stone50 },
-  title: { fontSize: 28, fontWeight: '800', color: colors.stone900, marginBottom: 24 },
-  input: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.stone200,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 16,
-    marginBottom: 12,
+  container: {
+    flex: 1,
+    padding: spacing.xxl,
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
-  primaryBtn: {
-    backgroundColor: colors.brand,
-    borderRadius: 16,
-    paddingVertical: 16,
+  brandWrap: {
     alignItems: 'center',
-    marginTop: 8,
+    marginBottom: spacing.xxl,
   },
-  primaryBtnText: { color: colors.white, fontWeight: '700', fontSize: 16 },
-  linkBtn: { marginTop: 16, alignItems: 'center' },
-  linkText: { color: colors.brand, fontWeight: '600' },
-  error: { color: colors.red700, marginBottom: 8 },
+  title: {
+    fontFamily: fonts.displayBold,
+    fontSize: 28,
+    color: colors.stone900,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    color: colors.stone600,
+    marginBottom: spacing.xxl,
+  },
+  linkBtn: {
+    marginTop: spacing.lg,
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  linkText: {
+    fontFamily: fonts.displaySemiBold,
+    color: colors.brand600,
+    fontSize: 15,
+  },
 })

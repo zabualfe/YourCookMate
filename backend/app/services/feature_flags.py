@@ -12,6 +12,7 @@ from app.services.instacart_connect import connect_is_configured
 def build_features_response() -> FeaturesResponse:
     flags = get_flag_values()
     instacart_on = settings.instacart_enabled and flags.get("instacart", False)
+    aws_base = (settings.aws_api_url or settings.email_api_url or "").strip().rstrip("/") or None
     return FeaturesResponse(
         auth=flags.get("auth", True),
         registration=flags.get("registration", True),
@@ -21,6 +22,7 @@ def build_features_response() -> FeaturesResponse:
         instacart=instacart_on,
         instacart_shopping=instacart_on and instacart_shopping_available(),
         instacart_connect=instacart_on and connect_is_configured(),
+        aws_api_url=aws_base,
     )
 
 

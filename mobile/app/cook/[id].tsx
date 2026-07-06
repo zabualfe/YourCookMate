@@ -8,15 +8,17 @@ import {
   Text,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import * as Haptics from 'expo-haptics'
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 import { getRecipe } from '@/api/client'
 import { StepMediaPreview } from '@/components/StepMediaPreview'
-import { colors } from '@/constants/theme'
+import { colors, commonStyles, fonts, radii, spacing } from '@/constants/theme'
 
 export default function CookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
+  const insets = useSafeAreaInsets()
   const [index, setIndex] = useState(0)
   const [showIngredients, setShowIngredients] = useState(false)
 
@@ -35,7 +37,7 @@ export default function CookScreen() {
 
   if (!id || isLoading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.container, styles.center]}>
         <ActivityIndicator color={colors.brand} />
       </View>
     )
@@ -43,8 +45,10 @@ export default function CookScreen() {
 
   if (error || !data) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error instanceof Error ? error.message : 'Recipe not found'}</Text>
+      <View style={[styles.container, styles.center]}>
+        <Text style={commonStyles.errorBannerText}>
+          {error instanceof Error ? error.message : 'Recipe not found'}
+        </Text>
       </View>
     )
   }
@@ -73,21 +77,21 @@ export default function CookScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.headerBtn}>
           <Text style={styles.exit}>Exit</Text>
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {recipe.title}
         </Text>
-        <Pressable onPress={() => setShowIngredients((v) => !v)}>
+        <Pressable onPress={() => setShowIngredients((v) => !v)} hitSlop={8} style={styles.headerBtn}>
           <Text style={styles.ingredientsBtn}>{showIngredients ? 'Hide' : 'Ingredients'}</Text>
         </Pressable>
       </View>
 
       <View style={styles.progressRow}>
         {recipe.steps.map((_, i) => (
-          <View key={i} style={[styles.progressDot, i <= index && styles.progressDotActive]} />
+          <View key={i} style={[styles.progressSegment, i <= index && styles.progressSegmentActive]} />
         ))}
       </View>
 
@@ -106,7 +110,9 @@ export default function CookScreen() {
         <Text style={styles.stepText}>{step.instruction}</Text>
         <View style={styles.metaRow}>
           {step.duration_minutes ? (
-            <Text style={styles.timer}>About {step.duration_minutes} min</Text>
+            <View style={styles.timerChip}>
+              <Text style={styles.timerText}>About {step.duration_minutes} min</Text>
+            </View>
           ) : null}
           {step.equipment.map((item) => (
             <View key={item} style={styles.equipmentChip}>
@@ -127,16 +133,16 @@ export default function CookScreen() {
         </ScrollView>
       )}
 
-      <View style={styles.nav}>
+      <View style={[styles.nav, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
         <Pressable
           onPress={goPrev}
           disabled={isFirst}
-          style={[styles.navBtn, isFirst && styles.navBtnDisabled]}
+          style={[commonStyles.secondaryBtn, styles.navBtn, isFirst && { opacity: 0.4 }]}
         >
-          <Text style={styles.navBtnText}>Previous</Text>
+          <Text style={commonStyles.secondaryBtnText}>Previous</Text>
         </Pressable>
-        <Pressable onPress={goNext} style={styles.navBtnPrimary}>
-          <Text style={styles.navBtnPrimaryText}>{isLast ? 'Done' : 'Next step'}</Text>
+        <Pressable onPress={goNext} style={[commonStyles.primaryBtn, styles.navBtn]}>
+          <Text style={commonStyles.primaryBtnText}>{isLast ? 'Done' : 'Next step'}</Text>
         </Pressable>
       </View>
     </View>
@@ -144,31 +150,63 @@ export default function CookScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.stone50 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: colors.surface },
+  center: { alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 12,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.stone200,
   },
-  exit: { color: colors.stone500, fontWeight: '600' },
-  headerTitle: { flex: 1, textAlign: 'center', fontWeight: '700', color: colors.stone900, marginHorizontal: 8 },
-  ingredientsBtn: { color: colors.brand, fontWeight: '600' },
-  progressRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 16, paddingTop: 16 },
-  progressDot: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.stone200 },
-  progressDotActive: { backgroundColor: colors.brand },
-  stepLabel: { paddingHorizontal: 16, paddingTop: 12, color: colors.stone500, fontWeight: '600' },
+  headerBtn: { minWidth: 72, minHeight: 44, justifyContent: 'center' },
+  exit: {
+    fontFamily: fonts.displaySemiBold,
+    color: colors.stone500,
+    fontSize: 15,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: fonts.displayBold,
+    color: colors.stone900,
+    marginHorizontal: spacing.sm,
+    fontSize: 16,
+  },
+  ingredientsBtn: {
+    textAlign: 'right',
+    fontFamily: fonts.displaySemiBold,
+    color: colors.brand600,
+    fontSize: 15,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.stone200,
+  },
+  progressSegmentActive: { backgroundColor: colors.brand600 },
+  stepLabel: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    fontFamily: fonts.displaySemiBold,
+    color: colors.stone500,
+    fontSize: 14,
+  },
   stepCard: {
-    margin: 16,
+    margin: spacing.lg,
     flex: 1,
     backgroundColor: colors.white,
-    borderRadius: 20,
+    borderRadius: radii.xxl,
     borderWidth: 1,
     borderColor: colors.stone200,
     overflow: 'hidden',
@@ -176,59 +214,63 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 22,
     lineHeight: 32,
+    fontFamily: fonts.displaySemiBold,
     color: colors.stone800,
-    fontWeight: '500',
-    padding: 24,
-    paddingTop: 16,
+    padding: spacing.xxl,
+    paddingTop: spacing.lg,
   },
   metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingBottom: 16,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.lg,
     alignItems: 'center',
   },
-  timer: { color: colors.brand, fontWeight: '600' },
+  timerChip: {
+    backgroundColor: colors.accent50,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  timerText: {
+    color: colors.accent700,
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 13,
+  },
   equipmentChip: {
     backgroundColor: colors.stone100,
     borderRadius: 999,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.md,
     paddingVertical: 6,
   },
-  equipmentText: { color: colors.stone600, fontWeight: '600', fontSize: 12 },
+  equipmentText: {
+    color: colors.stone600,
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 12,
+  },
   ingDrawer: {
     maxHeight: 160,
-    marginHorizontal: 16,
-    marginBottom: 8,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.stone200,
-    padding: 12,
+    padding: spacing.md,
   },
-  ingRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
-  ingName: { color: colors.stone800 },
-  ingQty: { color: colors.stone500 },
-  nav: { flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 32 },
-  navBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.stone200,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    backgroundColor: colors.white,
+  ingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
   },
-  navBtnText: { fontWeight: '700', color: colors.stone700 },
-  navBtnPrimary: {
-    flex: 1,
-    backgroundColor: colors.brand,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
+  ingName: { color: colors.stone800, fontFamily: fonts.sans },
+  ingQty: { color: colors.stone500, fontFamily: fonts.sans },
+  nav: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  navBtnPrimaryText: { fontWeight: '700', color: colors.white },
-  navBtnDisabled: { opacity: 0.4 },
-  error: { color: colors.red700 },
+  navBtn: { flex: 1 },
 })
