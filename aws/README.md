@@ -108,6 +108,11 @@ sam deploy --guided
 ```
 
 First run creates an S3 bucket for deployment artifacts automatically (`resolve_s3 = true`).
+CI empties that bucket after a successful deploy (`aws/scripts/cleanup-sam-source-bucket.sh`) and sets a 1-day lifecycle rule as a backup. Locally:
+
+```bash
+./aws/scripts/cleanup-sam-source-bucket.sh
+```
 
 ## Wired ingest flow (production)
 

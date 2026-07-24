@@ -215,6 +215,12 @@ jobs:
           echo "Deploying AWS stack (Stage, ApiFunction, ingest workers…)"
           sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"
 
+      - name: Empty SAM source bucket
+        if: success()
+        run: |
+          chmod +x aws/scripts/cleanup-sam-source-bucket.sh
+          ./aws/scripts/cleanup-sam-source-bucket.sh
+
       - name: Print CloudFormation errors on failure
         if: failure()
         run: |
