@@ -237,8 +237,8 @@ jobs:
       - name: Empty SAM source bucket
         if: success()
         run: |
-          chmod +x aws/scripts/cleanup-sam-source-bucket.sh
-          ./aws/scripts/cleanup-sam-source-bucket.sh
+          chmod +x scripts/cleanup-sam-source-bucket.sh
+          ./scripts/cleanup-sam-source-bucket.sh
 
       - name: Print CloudFormation errors on failure
         if: failure()
