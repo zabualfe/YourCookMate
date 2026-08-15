@@ -16,6 +16,7 @@ def test_features_instacart_off_by_default(monkeypatch):
             "social_ingest": True,
             "community": True,
             "instacart": False,
+            "aws_transcribe": False,
         },
     )
     monkeypatch.setattr(settings, "instacart_enabled", False)
@@ -28,6 +29,7 @@ def test_features_instacart_off_by_default(monkeypatch):
     assert result.instacart is False
     assert result.instacart_shopping is False
     assert result.instacart_connect is False
+    assert result.aws_transcribe is False
 
 
 def test_features_shopping_when_enabled_with_key(monkeypatch):
@@ -41,6 +43,7 @@ def test_features_shopping_when_enabled_with_key(monkeypatch):
             "social_ingest": True,
             "community": True,
             "instacart": True,
+            "aws_transcribe": False,
         },
     )
     monkeypatch.setattr(settings, "instacart_enabled", True)

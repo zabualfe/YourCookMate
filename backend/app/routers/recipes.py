@@ -23,6 +23,7 @@ from app.schemas.recipe_store import (
 from app.schemas.share import ShareRequest, ShareResponse
 from app.schemas.shop import InstacartLinkResponse
 from app.services.collections import collections_for_recipe, collections_for_recipe_ids
+from app.services.feature_flags import require_community_enabled
 from app.services.instacart import clear_instacart_cache, get_or_create_instacart_link
 from app.services.recipe_icons import delete_icon_file, enrich_recipe_step_urls, icon_public_url, save_recipe_icon
 from app.services.share import generate_share_slug
@@ -36,9 +37,25 @@ def _share_url(slug: str | None) -> str | None:
     return f"{settings.frontend_url.rstrip('/')}/r/{slug}"
 
 
+def _link_sharing_enabled(row: Recipe) -> bool:
+    return bool(row.share_slug)
+
+
+def _share_response(row: Recipe) -> ShareResponse:
+    link_on = _link_sharing_enabled(row)
+    return ShareResponse(
+        # is_public means "unlisted link is active" for API/UI compatibility — not community listing.
+        is_public=link_on,
+        shared_to_community=row.shared_to_community,
+        share_slug=row.share_slug if link_on else None,
+        share_url=_share_url(row.share_slug) if link_on else None,
+    )
+
+
 def _recipe_to_detail(row: Recipe, db: Session) -> RecipeDetailResponse:
     parsed = ParsedRecipe.model_validate(row.parsed_json)
     parsed = enrich_recipe_step_urls(parsed)
+    link_on = _link_sharing_enabled(row)
     return RecipeDetailResponse(
         id=str(row.id),
         title=row.title,
@@ -48,9 +65,10 @@ def _recipe_to_detail(row: Recipe, db: Session) -> RecipeDetailResponse:
         used_ai=row.used_ai,
         recipe=parsed,
         created_at=row.created_at.isoformat(),
-        is_public=row.is_public,
-        share_slug=row.share_slug,
-        share_url=_share_url(row.share_slug) if row.is_public else None,
+        is_public=link_on,
+        shared_to_community=row.shared_to_community,
+        share_slug=row.share_slug if link_on else None,
+        share_url=_share_url(row.share_slug) if link_on else None,
         collections=collections_for_recipe(db, row.id),
         icon_url=icon_public_url(row.icon_path),
     )
@@ -64,7 +82,7 @@ def parse_recipe_endpoint(body: ParseRecipeRequest) -> ParseRecipeResponse:
     from app.services.video_cache import get_cached_frames
 
     try:
-        recipe, used_ai = parse_recipe(body.raw_text)
+        recipe, used_ai = parse_recipe(body.raw_text, video_duration=body.video_duration)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to parse recipe: {exc}") from exc
 
@@ -260,19 +278,44 @@ def update_recipe_share(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
 
     if body.enabled:
+        # Unlisted link — knowing the slug is enough to view. Does not list in Community.
         if not row.share_slug:
             row.share_slug = generate_share_slug(db)
-        row.is_public = True
-    else:
         row.is_public = False
+    else:
+        # Invalidate the link; community cards would 404 without it.
+        row.share_slug = None
+        row.is_public = False
+        row.shared_to_community = False
 
     db.commit()
     db.refresh(row)
-    return ShareResponse(
-        is_public=row.is_public,
-        share_slug=row.share_slug if row.is_public else None,
-        share_url=_share_url(row.share_slug) if row.is_public else None,
-    )
+    return _share_response(row)
+
+
+@router.post("/{recipe_id}/community", response_model=ShareResponse)
+def update_recipe_community(
+    recipe_id: UUID,
+    body: ShareRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ShareResponse:
+    require_community_enabled()
+    row = db.query(Recipe).filter(Recipe.id == recipe_id, Recipe.user_id == user.id).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    if body.enabled:
+        # Community cards open /r/{slug}, so publishing mints an unlisted link if needed.
+        if not row.share_slug:
+            row.share_slug = generate_share_slug(db)
+        row.shared_to_community = True
+    else:
+        row.shared_to_community = False
+
+    db.commit()
+    db.refresh(row)
+    return _share_response(row)
 
 
 @router.post("/{recipe_id}/instacart-link", response_model=InstacartLinkResponse)

@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#bbf7d0',
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.brand50,
     padding: 20,
   },
   cardMuted: {

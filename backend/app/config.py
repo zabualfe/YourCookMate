@@ -23,10 +23,127 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-4o-mini"
-    openai_vision_model: str = "gpt-4o-mini"
-    social_vision_max_frames: int = 8
-    social_step_max_frames: int = 24
+    # Cookbook-quality parsing. Prefer Bedrock locally via AI_PROVIDER=bedrock|auto.
+    openai_model: str = "gpt-4o"
+    openai_vision_model: str = "gpt-4o"
+    ai_provider: str = Field(
+        default="auto",
+        validation_alias=AliasChoices("AI_PROVIDER", "ai_provider"),
+    )
+    aws_region: str = Field(
+        default="us-east-1",
+        validation_alias=AliasChoices("AWS_REGION", "aws_region"),
+    )
+    bedrock_parse_model: str = Field(
+        default="amazon.nova-pro-v1:0",
+        validation_alias=AliasChoices("BEDROCK_PARSE_MODEL", "bedrock_parse_model"),
+    )
+    bedrock_vision_model: str = Field(
+        default="amazon.nova-pro-v1:0",
+        validation_alias=AliasChoices("BEDROCK_VISION_MODEL", "bedrock_vision_model"),
+    )
+    # Gemini / Vertex native video understanding (preferred for social ingest when set).
+    # Use GEMINI_API_KEY for Google AI Studio, or Vertex via GOOGLE_CLOUD_PROJECT + ADC.
+    gemini_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
+    )
+    # Alias used by some Vertex setups (project id). Prefer GOOGLE_CLOUD_PROJECT.
+    google_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_KEY", "google_key"),
+    )
+    google_cloud_project: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_CLOUD_PROJECT", "google_cloud_project"),
+    )
+    vertex_location: str = Field(
+        default="us-central1",
+        validation_alias=AliasChoices("VERTEX_LOCATION", "vertex_location"),
+    )
+    gemini_vision_model: str = Field(
+        default="gemini-3.5-flash",
+        validation_alias=AliasChoices("GEMINI_VISION_MODEL", "gemini_vision_model"),
+    )
+    # How to watch cooking videos: gemini (native mp4) | frames (JPEG multi-agent) | auto
+    social_vision_provider: str = Field(
+        default="auto",
+        validation_alias=AliasChoices("SOCIAL_VISION_PROVIDER", "social_vision_provider"),
+    )
+    # Speech-to-text: auto (AWS when bucket+creds, else OpenAI), aws, or openai.
+    transcribe_provider: str = Field(
+        default="auto",
+        validation_alias=AliasChoices("TRANSCRIBE_PROVIDER", "transcribe_provider"),
+    )
+    # "auto" enables Amazon Transcribe language identification; else a code like "en-US".
+    transcribe_language: str = Field(
+        default="auto",
+        validation_alias=AliasChoices("TRANSCRIBE_LANGUAGE", "transcribe_language"),
+    )
+    transcribe_max_wait_seconds: float = Field(
+        default=90.0,
+        validation_alias=AliasChoices("TRANSCRIBE_MAX_WAIT_SECONDS", "transcribe_max_wait_seconds"),
+    )
+    # S3 bucket for Amazon Transcribe temp audio (required for aws provider).
+    ingest_temp_bucket: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("INGEST_TEMP_BUCKET", "ingest_temp_bucket"),
+    )
+    # accurate | balanced | fast — balanced is ~half the vision cost of accurate.
+    social_vision_quality: str = Field(
+        default="balanced",
+        validation_alias=AliasChoices("SOCIAL_VISION_QUALITY", "social_vision_quality"),
+    )
+    # Dense sampling overrides (used when quality preset doesn't apply / legacy).
+    social_frame_sample_fps: float = Field(
+        default=1.0,
+        validation_alias=AliasChoices("SOCIAL_FRAME_SAMPLE_FPS", "social_frame_sample_fps"),
+    )
+    social_scene_threshold: float = Field(
+        default=0.28,
+        validation_alias=AliasChoices("SOCIAL_SCENE_THRESHOLD", "social_scene_threshold"),
+    )
+    # Max stills kept in cache after dense+scene merge.
+    social_step_max_frames: int = Field(
+        default=60,
+        validation_alias=AliasChoices("SOCIAL_STEP_MAX_FRAMES", "social_step_max_frames"),
+    )
+    # Specialist vision calls subsample to this many frames.
+    social_vision_max_frames: int = Field(
+        default=24,
+        validation_alias=AliasChoices("SOCIAL_VISION_MAX_FRAMES", "social_vision_max_frames"),
+    )
+    # Multi-agent video analysis: segment observers + OCR/ingredient/action specialists.
+    social_vision_multi_agent: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("SOCIAL_VISION_MULTI_AGENT", "social_vision_multi_agent"),
+    )
+    social_vision_segment_frames: int = Field(
+        default=6,
+        validation_alias=AliasChoices("SOCIAL_VISION_SEGMENT_FRAMES", "social_vision_segment_frames"),
+    )
+    social_vision_segment_overlap: int = Field(
+        default=1,
+        validation_alias=AliasChoices(
+            "SOCIAL_VISION_SEGMENT_OVERLAP", "social_vision_segment_overlap"
+        ),
+    )
+    social_vision_max_segments: int = Field(
+        default=6,
+        validation_alias=AliasChoices("SOCIAL_VISION_MAX_SEGMENTS", "social_vision_max_segments"),
+    )
+    social_vision_max_workers: int = Field(
+        default=4,
+        validation_alias=AliasChoices("SOCIAL_VISION_MAX_WORKERS", "social_vision_max_workers"),
+    )
+    # How step video timestamps are assigned:
+    #   none — off (default). Steps are a plain ordered list; no video-time syncing.
+    #   deterministic — frame clock / scene cuts / transcript keyword match (no LLM times)
+    #   ai — allow vision/LLM timeline cues (drifts badly on silent short-form video)
+    social_timestamp_mode: str = Field(
+        default="none",
+        validation_alias=AliasChoices("SOCIAL_TIMESTAMP_MODE", "social_timestamp_mode"),
+    )
     step_clip_seconds: float = 3.5
     ytdlp_cookies_file: Optional[str] = None
     # Netscape-format cookies (for Render/cloud when a file path is not available).
@@ -89,6 +206,11 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("FEATURE_INSTACART", "FEATURE_INSTACART_ENABLED"),
     )
+    # Opt-in: Amazon Transcribe for speech-to-text (requires INGEST_TEMP_BUCKET).
+    feature_aws_transcribe_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("FEATURE_AWS_TRANSCRIBE", "FEATURE_AWS_TRANSCRIBE_ENABLED"),
+    )
     instacart_api_key: Optional[str] = None
     instacart_api_base: str = "https://connect.dev.instacart.tools"
     instacart_link_expires_days: int = 30
@@ -103,6 +225,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "openai_api_key",
+        "gemini_api_key",
         "resend_api_key",
         "email_api_secret",
         "google_client_secret",

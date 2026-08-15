@@ -22,6 +22,19 @@ Parameters:
   BedrockParseModel:
     Type: String
     Default: amazon.nova-lite-v1:0
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Google AI Studio API key for native Gemini video ingest.
+  GeminiVisionModel:
+    Type: String
+    Default: gemini-3.5-flash
+  SocialVisionProvider:
+    Type: String
+    Default: auto
+    AllowedValues: [auto, gemini, frames]
+    Description: auto prefers Gemini when GEMINI_API_KEY is set, else Bedrock frames.
   FrontendUrl:
     Type: String
     Default: "*"
@@ -329,7 +342,7 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
-      Description: Native ingest — yt-dlp, Bedrock Nova vision, Amazon Transcribe.
+      Description: Native ingest — yt-dlp, Gemini / Bedrock vision, Amazon Transcribe.
       Handler: ingest_worker.app.handler
       Timeout: 900
       MemorySize: 2048
@@ -341,6 +354,9 @@ Resources:
           YTDLP_COOKIES_B64: !Ref YtdlpCookiesB64
           INGEST_TEMP_BUCKET: !Ref IngestTempBucket
           BEDROCK_VISION_MODEL: !Ref BedrockVisionModel
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          GEMINI_VISION_MODEL: !Ref GeminiVisionModel
+          SOCIAL_VISION_PROVIDER: !Ref SocialVisionProvider
           FEATURE_AI_ENABLED: "true"
           STAGE: !Ref Stage
       Policies:

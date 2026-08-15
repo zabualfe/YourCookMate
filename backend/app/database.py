@@ -67,6 +67,15 @@ def _migrate_schema() -> None:
                     conn.execute(text("ALTER TABLE recipes ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 0"))
                 else:
                     conn.execute(text("ALTER TABLE recipes ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE"))
+            if "shared_to_community" not in recipe_cols:
+                if settings.uses_sqlite:
+                    conn.execute(
+                        text("ALTER TABLE recipes ADD COLUMN shared_to_community BOOLEAN NOT NULL DEFAULT 0")
+                    )
+                else:
+                    conn.execute(
+                        text("ALTER TABLE recipes ADD COLUMN shared_to_community BOOLEAN NOT NULL DEFAULT FALSE")
+                    )
             if "share_slug" not in recipe_cols:
                 conn.execute(text("ALTER TABLE recipes ADD COLUMN share_slug VARCHAR(32)"))
                 conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_recipes_share_slug ON recipes (share_slug)"))

@@ -9,7 +9,15 @@ from app.config import settings
 from app.database import SessionLocal
 from app.models.feature_flag import FeatureFlag
 
-FLAG_KEYS = ("auth", "registration", "ai", "social_ingest", "community", "instacart")
+FLAG_KEYS = (
+    "auth",
+    "registration",
+    "ai",
+    "social_ingest",
+    "community",
+    "instacart",
+    "aws_transcribe",
+)
 
 _DEFAULTS: dict[str, bool] = {
     "auth": True,
@@ -18,6 +26,7 @@ _DEFAULTS: dict[str, bool] = {
     "social_ingest": True,
     "community": True,
     "instacart": False,
+    "aws_transcribe": False,
 }
 
 _ENV_FALLBACK = {
@@ -27,6 +36,7 @@ _ENV_FALLBACK = {
     "social_ingest": lambda: settings.feature_social_ingest_enabled,
     "community": lambda: settings.feature_community_enabled,
     "instacart": lambda: settings.feature_instacart_enabled,
+    "aws_transcribe": lambda: settings.feature_aws_transcribe_enabled,
 }
 
 _cache: dict[str, bool] | None = None

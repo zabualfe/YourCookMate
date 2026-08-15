@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { ShareQuickAdd } from '../components/SharePanel'
+import { CommunityShareButton } from '../components/CommunityShareButton'
 import { CollectionQuickAdd } from '../components/CollectionPicker'
 import { RecipeCollectionChips } from '../components/RecipeCollectionChips'
 import { RecipeEditor, cloneRecipe, normalizeRecipe, type EditorRecipe } from '../components/RecipeEditor'
@@ -73,6 +74,7 @@ export function RecipeDetailPage() {
         cook_time: data.recipe.cook_time_minutes,
         collections: data.collections ?? [],
         is_public: data.is_public ?? false,
+        shared_to_community: data.shared_to_community ?? false,
         share_url: data.share_url,
         source_url: data.source_url,
         isLocal: false,
@@ -88,6 +90,7 @@ export function RecipeDetailPage() {
           cook_time: local.recipe.cook_time_minutes,
           collections: [],
           is_public: false,
+          shared_to_community: false,
           share_url: undefined as string | undefined,
           source_url: local.sourceUrl,
           isLocal: true,
@@ -359,6 +362,11 @@ export function RecipeDetailPage() {
                         recipeId={data.id}
                         initial={{ is_public: detail.is_public, share_url: detail.share_url }}
                         isPublic={detail.is_public}
+                      />
+                      <CommunityShareButton
+                        recipeId={data.id}
+                        recipeTitle={detail.title}
+                        sharedToCommunity={detail.shared_to_community}
                       />
                     </>
                   )}

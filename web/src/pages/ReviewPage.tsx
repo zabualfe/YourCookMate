@@ -36,7 +36,26 @@ export function ReviewPage() {
 
   if (!draft || !recipeDraft) return null
 
-  const { rawText, usedAi, sourceType, sourceUrl } = draft
+  const { rawText, usedAi, sourceType, sourceUrl, extractionNotes = [] } = draft
+  const isVideoSource = Boolean(sourceType && sourceType !== 'text')
+  const geminiSucceeded = extractionNotes.some((n) => n.includes('Vision: Gemini succeeded'))
+  const geminiFailed = extractionNotes.some(
+    (n) =>
+      n.includes('Vision: Gemini failed') ||
+      n.includes('Vision: Gemini produced no') ||
+      n.includes('Gemini video analysis failed') ||
+      n.includes('Gemini returned no recipe'),
+  )
+  const usedFrames = extractionNotes.some((n) => n.includes('frame stills'))
+  const visionHeadline = geminiSucceeded
+    ? 'Video analyzed with Gemini'
+    : geminiFailed && usedFrames
+      ? 'Gemini failed — used frame stills instead'
+      : geminiFailed
+        ? 'Gemini failed — no visual brief'
+        : usedFrames
+          ? 'Video analyzed with frame stills'
+          : extractionNotes.find((n) => n.startsWith('Vision:')) ?? null
 
   const buildRecipe = () => normalizeRecipe(recipeDraft)
 
@@ -108,17 +127,66 @@ export function ReviewPage() {
           ← Back
         </Link>
 
-        <div className="mt-4 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-stone-900">Review your recipe</h1>
-            <p className="mt-1 text-stone-600">
-              {usedAi ? 'Parsed with AI' : 'Parsed with fallback'} · {recipeDraft.steps.length} steps
-              {sourceType && sourceType !== 'text' && (
-                <> · from {videoPlatformLabel(sourceType)}</>
-              )}
-            </p>
-          </div>
+        <div className="mt-4">
+          <h1 className="text-2xl font-bold text-stone-900">Review your recipe</h1>
+          <p className="mt-1 text-stone-600">
+            {usedAi ? 'Parsed with AI' : 'Parsed with fallback'} · {recipeDraft.steps.length} steps
+            {isVideoSource && <> · from {videoPlatformLabel(sourceType!)}</>}
+          </p>
         </div>
+
+        {isVideoSource && (
+          <div
+            className={[
+              'mt-4 rounded-2xl border-2 px-5 py-4',
+              geminiSucceeded
+                ? 'border-emerald-400 bg-emerald-50'
+                : geminiFailed
+                  ? 'border-red-300 bg-red-50'
+                  : usedFrames
+                    ? 'border-amber-400 bg-amber-50'
+                    : extractionNotes.length > 0
+                      ? 'border-stone-300 bg-stone-50'
+                      : 'border-stone-300 bg-stone-100',
+            ].join(' ')}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              How this video was imported
+            </p>
+            <p
+              className={[
+                'mt-1 text-lg font-bold',
+                geminiSucceeded
+                  ? 'text-emerald-800'
+                  : geminiFailed
+                    ? 'text-red-800'
+                    : usedFrames
+                      ? 'text-amber-900'
+                      : 'text-stone-800',
+              ].join(' ')}
+            >
+              {visionHeadline ?? 'Import notes missing for this draft'}
+            </p>
+            {extractionNotes.length > 0 ? (
+              <ul className="mt-3 space-y-1.5 text-sm text-stone-700">
+                {extractionNotes.map((note) => (
+                  <li key={note} className="flex gap-2">
+                    <span className="shrink-0 text-stone-400">•</span>
+                    <span>{note}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-stone-600">
+                This review was saved before notes were stored. Go back to{' '}
+                <Link to="/new" className="font-semibold underline">
+                  Import
+                </Link>{' '}
+                and paste the link again (restart the backend if you just added a Gemini key).
+              </p>
+            )}
+          </div>
+        )}
 
         {!isAuthenticated && (
           <p className="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">

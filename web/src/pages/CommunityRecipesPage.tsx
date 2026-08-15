@@ -24,7 +24,7 @@ export function CommunityRecipesPage() {
       <div className="mx-auto max-w-3xl px-4 py-8">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Community Recipes</h1>
-          <p className="mt-1 text-stone-600">Recipes shared publicly by other cooks</p>
+          <p className="mt-1 text-stone-600">Recipes shared publicly by the community</p>
         </div>
 
         <input

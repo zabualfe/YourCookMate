@@ -45,14 +45,14 @@ export default function RootLayout() {
               <Stack
                 screenOptions={{
                   headerStyle: { backgroundColor: colors.white },
-                  headerTintColor: colors.brand600,
+                  headerTintColor: colors.brand700,
                   headerTitleStyle: { fontFamily: 'Nunito_600SemiBold' },
                   contentStyle: { backgroundColor: colors.surface },
                 }}
               >
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="login" options={{ presentation: 'modal', headerShown: true, title: 'Sign in' }} />
-                <Stack.Screen name="register" options={{ presentation: 'modal', headerShown: true, title: 'Register' }} />
+                <Stack.Screen name="register" options={{ presentation: 'modal', headerShown: true, title: 'Create account' }} />
                 <Stack.Screen name="review" options={{ headerShown: true, title: 'Review recipe' }} />
                 <Stack.Screen name="cook/[id]" options={{ gestureEnabled: false, headerShown: false }} />
                 <Stack.Screen name="recipes/[id]" options={{ headerShown: true }} />

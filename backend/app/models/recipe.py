@@ -29,7 +29,11 @@ class Recipe(Base):
     source_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     parsed_json: Mapped[dict] = mapped_column(JSONStore, nullable=False)
     used_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Legacy flag — link access is gated by share_slug alone (unlisted). Kept for older rows.
     is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Opt-in listing in the Community tab. Community cards open /r/{share_slug}.
+    shared_to_community: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Unlisted share link. Anyone with the slug can view; does not imply community listing.
     share_slug: Mapped[Optional[str]] = mapped_column(String(32), unique=True, nullable=True, index=True)
     icon_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     instacart_link_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)

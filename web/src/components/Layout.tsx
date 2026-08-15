@@ -47,13 +47,13 @@ export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
                 to="/"
                 className="flex shrink-0 items-center font-semibold text-stone-900 transition hover:opacity-80"
               >
-                <BrandLogo />
+                <BrandLogo showBadge={false} />
               </Link>
 
               <nav className="flex items-center gap-1 sm:gap-2">
                 <Link
                   to="/new"
-                  className="rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-600/20 transition hover:bg-brand-700 sm:px-4"
+                  className="rounded-lg bg-brand-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-800 sm:px-4"
                 >
                   Add recipe
                 </Link>

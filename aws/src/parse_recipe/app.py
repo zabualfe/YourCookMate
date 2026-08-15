@@ -40,7 +40,10 @@ def handler(event, context):
         return json_response(422, {"detail": "video_duration must be non-negative"})
 
     try:
-        recipe, used_ai = parse_recipe(raw_text)
+        recipe, used_ai = parse_recipe(
+            raw_text,
+            video_duration=float(video_duration) if isinstance(video_duration, (int, float)) else None,
+        )
     except Exception as exc:
         return json_response(502, {"detail": f"Failed to parse recipe: {exc}"})
 

@@ -12,6 +12,7 @@ export interface AppFeatures {
   instacart: boolean
   instacart_shopping: boolean
   instacart_connect: boolean
+  aws_transcribe: boolean
 }
 
 const DEFAULTS: AppFeatures = {
@@ -23,6 +24,7 @@ const DEFAULTS: AppFeatures = {
   instacart: false,
   instacart_shopping: false,
   instacart_connect: false,
+  aws_transcribe: false,
 }
 
 function parseBool(raw: string | undefined): boolean | undefined {
@@ -64,6 +66,7 @@ export default async function handler(
   applyOverride(flags, 'social_ingest', 'FEATURE_SOCIAL_INGEST')
   applyOverride(flags, 'community', 'FEATURE_COMMUNITY')
   applyOverride(flags, 'instacart', 'FEATURE_INSTACART')
+  applyOverride(flags, 'aws_transcribe', 'FEATURE_AWS_TRANSCRIBE')
 
   if (parseBool(process.env.FEATURE_INSTACART) === false) {
     flags.instacart_shopping = false

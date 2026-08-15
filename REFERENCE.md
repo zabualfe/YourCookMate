@@ -513,6 +513,7 @@ erDiagram
     jsonb parsed_json
     jsonb extraction_metadata
     boolean is_public
+    boolean shared_to_community
     string share_slug
   }
   oauth_accounts {
@@ -571,7 +572,8 @@ erDiagram
 | GET | `/recipes/{id}/cook` | Steps optimized for cook mode |
 | PATCH | `/recipes/{id}` | Edit title/steps after parse |
 | DELETE | `/recipes/{id}` | Remove from library |
-| POST | `/recipes/{id}/share` | Generate public slug |
+| POST | `/recipes/{id}/share` | Create/disable an unlisted share link (anyone with the URL can view; not Community) |
+| POST | `/recipes/{id}/community` | Publish/unpublish the recipe in the Community tab |
 | GET | `/r/{slug}` | Public shared recipe |
 | CRUD | `/collections`, `/collections/{id}/recipes` | Recipe folders |
 | CRUD | `/meal-plans`, `/meal-plans/{id}/entries` | Weekly planner |

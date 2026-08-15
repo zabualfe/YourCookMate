@@ -6,9 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.deps import get_optional_user
 from app.models.recipe import Recipe
-from app.models.user import User
 from app.routers.share import _author_name
 from app.schemas.share import CommunityRecipeListResponse, CommunityRecipeSummary
 from app.services.feature_flags import require_community_enabled
@@ -21,16 +19,16 @@ router = APIRouter(prefix="/community", tags=["community"])
 def list_community_recipes(
     q: Optional[str] = Query(default=None, max_length=200),
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user),
 ) -> CommunityRecipeListResponse:
     require_community_enabled()
     query = (
         db.query(Recipe)
         .options(joinedload(Recipe.user))
-        .filter(Recipe.is_public.is_(True), Recipe.share_slug.isnot(None))
+        .filter(
+            Recipe.shared_to_community.is_(True),
+            Recipe.share_slug.isnot(None),
+        )
     )
-    if user is not None:
-        query = query.filter(Recipe.user_id != user.id)
     if q:
         query = query.filter(Recipe.title.ilike(f"%{q}%"))
     rows = query.order_by(Recipe.created_at.desc()).all()

@@ -24,11 +24,12 @@ def _author_name(user: User) -> str:
     return user.email.split("@")[0]
 
 
-def _get_public_recipe(db: Session, slug: str) -> Recipe:
+def _get_shared_recipe(db: Session, slug: str) -> Recipe:
+    """Resolve an unlisted share link. Knowing the slug is enough — no community/public listing required."""
     row = (
         db.query(Recipe)
         .options(joinedload(Recipe.user))
-        .filter(Recipe.share_slug == slug, Recipe.is_public.is_(True))
+        .filter(Recipe.share_slug == slug)
         .first()
     )
     if row is None:
@@ -40,7 +41,7 @@ def _get_public_recipe(db: Session, slug: str) -> Recipe:
 def get_shared_recipe(slug: str, db: Session = Depends(get_db)) -> SharedRecipeResponse:
     from app.services.recipe_icons import enrich_recipe_step_urls
 
-    row = _get_public_recipe(db, slug)
+    row = _get_shared_recipe(db, slug)
     parsed = ParsedRecipe.model_validate(row.parsed_json)
     parsed = enrich_recipe_step_urls(parsed)
     return SharedRecipeResponse(
@@ -58,7 +59,7 @@ def get_shared_recipe(slug: str, db: Session = Depends(get_db)) -> SharedRecipeR
 
 @router.post("/{slug}/instacart-link", response_model=InstacartLinkResponse)
 def create_shared_instacart_link(slug: str, db: Session = Depends(get_db)) -> InstacartLinkResponse:
-    row = _get_public_recipe(db, slug)
+    row = _get_shared_recipe(db, slug)
     recipe = ParsedRecipe.model_validate(row.parsed_json)
     partner_url = f"{settings.frontend_url.rstrip('/')}/r/{slug}"
     url, cached = get_or_create_instacart_link(row, recipe, partner_linkback_url=partner_url)
@@ -76,7 +77,7 @@ def save_shared_recipe(
     from app.services.recipe_icons import enrich_recipe_step_urls
     from app.services.step_images import copy_step_images
 
-    source = _get_public_recipe(db, slug)
+    source = _get_shared_recipe(db, slug)
     if source.user_id == user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This recipe is already in your library")
 
@@ -111,6 +112,7 @@ def save_shared_recipe(
         recipe=parsed,
         created_at=row.created_at.isoformat(),
         is_public=False,
+        shared_to_community=False,
         share_slug=None,
         share_url=None,
     )

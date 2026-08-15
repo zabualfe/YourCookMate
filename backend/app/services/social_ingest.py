@@ -14,6 +14,7 @@ from app.services.feature_flags import ai_allowed
 from app.services.video_cache import (
     ensure_video_cached,
     get_cached_frames,
+    get_cached_frame_times,
     get_cached_video,
     transcribe_cached_video,
 )
@@ -31,6 +32,24 @@ _LOGIN_REQUIRED_DETAIL = (
 )
 
 _ytdlp_cookies_cache_path: Optional[str] = None
+
+
+def _short_vision_error(exc: BaseException) -> str:
+    """Keep import notes readable (429 payloads are huge)."""
+    text = str(exc)
+    if "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower():
+        return (
+            "quota exceeded for this Gemini model/key (free tier). "
+            "Link a billing account in Google AI Studio / Cloud, then restart the backend."
+        )
+    if "404" in text or "no longer available" in text.lower() or "NOT_FOUND" in text:
+        return (
+            "this Gemini model id is retired. "
+            "Set GEMINI_VISION_MODEL=gemini-3.5-flash in backend/.env and restart."
+        )
+    if len(text) > 180:
+        return text[:177] + "…"
+    return text
 
 
 def _ytdlp_cookie_file() -> Optional[str]:
@@ -237,12 +256,13 @@ def _description_from_info(info: dict) -> str:
 
 
 def _transcribe_audio(url: str) -> Optional[str]:
-    if not settings.openai_api_key or not ai_allowed():
+    from app.services.transcription import resolve_transcribe_provider, transcribe_audio_file
+
+    if not ai_allowed() or resolve_transcribe_provider() is None:
         return None
 
     try:
         import yt_dlp
-        from openai import OpenAI
     except ImportError:
         return None
 
@@ -268,21 +288,7 @@ def _transcribe_audio(url: str) -> Optional[str]:
         if not audio_files:
             return None
 
-        try:
-            client = OpenAI(api_key=settings.openai_api_key)
-            with audio_files[0].open("rb") as audio_file:
-                result = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    response_format="text",
-                )
-        except Exception:
-            return None
-
-        text = (result if isinstance(result, str) else getattr(result, "text", "")).strip()
-        if len(text) < 12:
-            return None
-        return text
+        return transcribe_audio_file(audio_files[0])
 
 
 def _dedupe_title_description(title: Optional[str], description: Optional[str]) -> tuple[Optional[str], Optional[str]]:
@@ -302,6 +308,61 @@ def _dedupe_title_description(title: Optional[str], description: Optional[str]) 
     return t, d
 
 
+def _food_tokens(text: str) -> set[str]:
+    """Rough food/ingredient tokens for caption-vs-transcript conflict checks."""
+    stop = {
+        "the", "and", "for", "with", "from", "this", "that", "into", "over", "onto",
+        "cup", "cups", "tablespoon", "tablespoons", "teaspoon", "teaspoons", "tbsp",
+        "tsp", "gram", "grams", "ml", "oz", "make", "recipe", "need", "add", "cook",
+        "cooked", "fresh", "minced", "sliced", "powder", "you", "your", "video",
+        "spoken", "instructions", "timestamps", "seconds", "frame", "visual",
+    }
+    tokens = set()
+    for raw in re.findall(r"[a-zA-Z][a-zA-Z&']{2,}", text.lower()):
+        word = raw.strip("'")
+        if word in stop or len(word) < 3:
+            continue
+        tokens.add(word)
+    return tokens
+
+
+_CYRILLIC_OR_CJK = re.compile(r"[\u0400-\u04FF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]")
+
+
+def _transcript_looks_wrong_language(caption: str, transcript: str) -> bool:
+    """Drop transcripts that are mostly a different script than the caption."""
+    if not transcript.strip():
+        return False
+    letters = re.findall(r"[A-Za-z\u0400-\u04FF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]", transcript)
+    if len(letters) < 12:
+        return False
+    foreign = sum(1 for ch in letters if _CYRILLIC_OR_CJK.match(ch))
+    foreign_ratio = foreign / max(len(letters), 1)
+    caption_latin = len(re.findall(r"[A-Za-z]", caption or ""))
+    # Caption is English-ish but transcript is mostly Cyrillic/CJK → wrong track.
+    return foreign_ratio >= 0.35 and caption_latin >= 40
+
+
+def _transcript_conflicts_with_caption(caption: str, transcript: str) -> bool:
+    """True when spoken audio looks like a different dish than the caption recipe."""
+    if not caption.strip() or not transcript.strip():
+        return False
+    if _transcript_looks_wrong_language(caption, transcript):
+        return True
+    if not _looks_like_recipe(caption):
+        return False
+    cap = _food_tokens(caption)
+    spoken = _food_tokens(transcript)
+    # Foreign-script transcript often yields almost no Latin food tokens.
+    if len(cap) >= 4 and len(spoken) < 2:
+        return True
+    if len(cap) < 4 or len(spoken) < 3:
+        return False
+    overlap = len(cap & spoken) / max(len(cap), 1)
+    # Caption has a real recipe but spoken barely shares food words → wrong audio.
+    return overlap < 0.2
+
+
 def _merge_text_parts(
     title: Optional[str],
     description: Optional[str],
@@ -313,17 +374,58 @@ def _merge_text_parts(
     parts: list[str] = []
     generic_titles = {"video", "instagram reel", "tiktok", "untitled", "reel", "instagram"}
 
-    if title and title.lower() not in generic_titles:
-        parts.append(title.strip())
-    if description and description.strip():
-        parts.append(description.strip())
-    if subtitle and subtitle.strip():
-        parts.append("On-screen captions:\n" + subtitle.strip())
-    if transcript and transcript.strip():
-        parts.append("Spoken instructions:\n" + transcript.strip())
+    caption_body = "\n\n".join(
+        p for p in [
+            title.strip() if title and title.lower() not in generic_titles else "",
+            description.strip() if description else "",
+            ("On-screen captions:\n" + subtitle.strip()) if subtitle and subtitle.strip() else "",
+        ]
+        if p
+    )
+
+    if caption_body:
+        parts.append(
+            "PRIMARY RECIPE SOURCE (creator caption — dish identity, listed ingredients/quantities, "
+            "and written method. Extract EVERY listed spice/powder. Cross-check against what was "
+            "watched in the video; do not invent a different dish):\n"
+            + caption_body
+        )
+
+    usable_transcript = transcript.strip() if transcript and transcript.strip() else ""
+    if usable_transcript and caption_body and _transcript_conflicts_with_caption(caption_body, usable_transcript):
+        # Wrong-language / wrong-track audio is common on social downloads — do not let it invent ingredients.
+        usable_transcript = ""
+
+    if usable_transcript:
+        parts.append(
+            "Spoken instructions (what was heard — use for timing and technique; "
+            "do not invent a different dish than the caption):\n"
+            + usable_transcript
+        )
     if visual and visual.strip():
-        parts.append("From the video (visual analysis):\n" + visual.strip())
+        parts.append(
+            "VIDEO OBSERVATIONS (multi-agent agents WATCHED the frames — primary source for "
+            "what the cook actually does, technique, foods seen being used, and [m:ss] times. "
+            "Merge with the caption: keep caption dish identity and listed spices; prefer "
+            "watched actions for step detail and timestamps):\n"
+            + visual.strip()
+        )
     return "\n\n".join(parts).strip()
+
+
+def _caption_body_for_vision(
+    title: Optional[str],
+    description: Optional[str],
+    subtitle: Optional[str],
+) -> Optional[str]:
+    generic_titles = {"video", "instagram reel", "tiktok", "untitled", "reel", "instagram"}
+    parts = [
+        title.strip() if title and title.lower() not in generic_titles else "",
+        description.strip() if description else "",
+        subtitle.strip() if subtitle and subtitle.strip() else "",
+    ]
+    text = "\n\n".join(p for p in parts if p).strip()
+    return text or None
 
 
 def _needs_enrichment(merged: str, transcript: Optional[str]) -> bool:
@@ -344,8 +446,12 @@ def _should_run_audio(source_type: str, merged: str, transcript: Optional[str]) 
     return _needs_enrichment(merged, None)
 
 
+_VIDEO_PLATFORMS = frozenset({"youtube", "facebook", "vimeo", "pinterest"}) | SHORT_FORM_PLATFORMS
+
+
 def _should_run_visual(source_type: str, merged: str, transcript: Optional[str]) -> bool:
-    if source_type in SHORT_FORM_PLATFORMS:
+    # Always analyze frames for video platforms — step timestamps need visual grounding.
+    if source_type in _VIDEO_PLATFORMS:
         return True
     return _needs_enrichment(merged, transcript)
 
@@ -374,7 +480,7 @@ def _prepare_video_cache(
         source_url,
         _ytdlp_options,
         duration=duration,
-        frame_count=settings.social_step_max_frames,
+        frame_count=None,
     )
 
 
@@ -404,27 +510,87 @@ def _run_visual_step(
     source_url: str,
     notes: list[str],
     duration: Optional[float] = None,
+    caption: Optional[str] = None,
 ) -> Optional[str]:
-    notes.append("Analyzing video frames for on-screen text and cooking steps…")
-    frames = get_cached_frames(source_url)
-    if frames:
-        visual_text = analyze_frames_for_recipe(frames)
-    else:
+    # Ensure the mp4 (and optional JPEG stills for step thumbnails) are cached.
+    cached = get_cached_video(source_url)
+    if not cached:
         cached = ensure_video_cached(
             source_url,
             _ytdlp_options,
             duration=duration,
-            frame_count=settings.social_step_max_frames,
+            frame_count=None,
         )
-        if cached:
-            frames = get_cached_frames(source_url)
-            visual_text = analyze_frames_for_recipe(frames) if frames else None
-        else:
+
+    vision_provider = (settings.social_vision_provider or "auto").strip().lower()
+    visual_text: Optional[str] = None
+
+    # Prefer Gemini native video when configured — model watches the full mp4.
+    from app.services.video_gemini import analyze_video_with_gemini, gemini_video_configured
+
+    gemini_ready = gemini_video_configured()
+    try_gemini = vision_provider in {"gemini", "auto"} and gemini_ready
+    notes.append(
+        f"Vision provider={vision_provider}; Gemini configured={gemini_ready}; "
+        f"cached video={'yes' if cached else 'no'}."
+    )
+
+    if try_gemini and cached:
+        notes.append(
+            f"Vision: Gemini ({settings.gemini_vision_model}) — watching the full mp4…"
+        )
+        try:
+            visual_text = analyze_video_with_gemini(
+                cached,
+                duration=duration,
+                caption=caption,
+            )
+        except Exception as exc:
+            notes.append(f"Vision: Gemini failed — {_short_vision_error(exc)}")
             visual_text = None
+        if visual_text:
+            notes.append("Vision: Gemini succeeded — brief added from the full video.")
+            return visual_text
+        notes.append("Vision: Gemini produced no recipe content.")
+
+    if vision_provider == "gemini" and not gemini_ready:
+        notes.append(
+            "Vision: Gemini unavailable — set GEMINI_API_KEY (or Vertex project) and restart the backend."
+        )
+        # Still try frame stills so import is not empty.
+    if try_gemini and not cached:
+        notes.append("Vision: Gemini skipped — no cached video file to analyze.")
+
+    notes.append(
+        "Vision: frame stills (Bedrock/OpenAI multi-agent) — used because Gemini did not return a brief."
+        if try_gemini
+        else "Vision: frame stills (Bedrock/OpenAI multi-agent)."
+    )
+    frames = get_cached_frames(source_url)
+    if not frames and cached:
+        # Re-run cache helper so stills exist for the frame fallback.
+        ensure_video_cached(
+            source_url,
+            _ytdlp_options,
+            duration=duration,
+            frame_count=None,
+        )
+        frames = get_cached_frames(source_url)
+
+    if frames:
+        visual_text = analyze_frames_for_recipe(
+            frames,
+            duration=duration,
+            frame_times=get_cached_frame_times(source_url),
+            caption=caption,
+        )
+
     if visual_text:
-        notes.append("Added visual analysis from the video (text overlays and actions).")
-    elif not settings.openai_api_key or not ai_allowed():
-        notes.append("Video analysis skipped (AI disabled or OPENAI_API_KEY not set).")
+        notes.append(
+            "Added multi-agent visual brief from watching the video (actions, foods, timestamps)."
+        )
+    elif not ai_allowed():
+        notes.append("Video analysis skipped (AI disabled).")
     else:
         notes.append("Could not analyze video frames — paste the caption manually if needed.")
     return visual_text
@@ -494,7 +660,13 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
     merged = _merge_text_parts(title, description, subtitle_text, transcript, None)
 
     if _should_run_visual(source_type, merged, transcript):
-        visual_text = _run_visual_step(source_url, notes, duration)
+        caption_for_vision = _caption_body_for_vision(title, description, subtitle_text)
+        visual_text = _run_visual_step(
+            source_url,
+            notes,
+            duration,
+            caption=caption_for_vision,
+        )
 
     raw_text = _merge_text_parts(title, description, subtitle_text, transcript, visual_text)
     if not raw_text and metadata_error is not None:

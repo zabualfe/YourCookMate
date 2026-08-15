@@ -9,6 +9,7 @@ On your existing **Web application** OAuth client:
 1. **Authorized redirect URIs** — add:
    - `http://127.0.0.1:8000/auth/google/mobile/callback`
    - `http://localhost:8000/auth/google/mobile/callback`
+   - `http://YOUR_MAC_LAN_IP:8000/auth/google/mobile/callback` (required for a physical iPhone)
 2. Copy the **Client secret** (Credentials → your web client → Client secret)
 
 ### 2. Backend `.env`
@@ -16,6 +17,8 @@ On your existing **Web application** OAuth client:
 ```env
 GOOGLE_CLIENT_ID=your-web-client-id
 GOOGLE_CLIENT_SECRET=your-web-client-secret
+# Simulator: http://127.0.0.1:8000
+# Physical iPhone: http://YOUR_MAC_LAN_IP:8000 (must match Google redirect URI)
 API_BASE_URL=http://127.0.0.1:8000
 ```
 

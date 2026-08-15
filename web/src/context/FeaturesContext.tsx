@@ -12,6 +12,7 @@ const DEFAULT_FEATURES: AppFeatures = {
   instacart: false,
   instacart_shopping: false,
   instacart_connect: false,
+  aws_transcribe: false,
 }
 
 const FeaturesContext = createContext<AppFeatures>(DEFAULT_FEATURES)

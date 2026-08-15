@@ -328,10 +328,71 @@ def _run_audio_step(
     return transcript
 
 
-def _run_visual_step(source_url: str, notes: list[str], duration: Optional[float] = None) -> Optional[str]:
-    notes.append("Analyzing video frames with Amazon Nova…")
+def _short_vision_error(exc: BaseException) -> str:
+    text = str(exc)
+    if "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower():
+        return "quota exceeded for this Gemini model/key — enable paid billing in AI Studio."
+    if "404" in text or "no longer available" in text.lower() or "NOT_FOUND" in text:
+        return "this Gemini model id is retired — set GEMINI_VISION_MODEL to a current Flash model."
+    if len(text) > 180:
+        return text[:177] + "…"
+    return text
+
+
+def _run_visual_step(
+    source_url: str,
+    notes: list[str],
+    duration: Optional[float] = None,
+    caption: Optional[str] = None,
+) -> Optional[str]:
+    from ingest_lib.video_gemini import analyze_video_with_gemini, gemini_video_configured
+
+    cached = get_cached_video(source_url)
+    if not cached:
+        ensure_video_cached(
+            source_url,
+            _ytdlp_options,
+            duration=duration,
+            frame_count=_ingest_frame_count(),
+        )
+        cached = get_cached_video(source_url)
+
+    vision_provider = (settings.social_vision_provider or "auto").strip().lower()
+    gemini_ready = gemini_video_configured()
+    try_gemini = vision_provider in {"gemini", "auto"} and gemini_ready
+    notes.append(
+        f"Vision provider={vision_provider}; Gemini configured={gemini_ready}; "
+        f"cached video={'yes' if cached else 'no'}."
+    )
+
+    if try_gemini and cached:
+        notes.append(
+            f"Vision: Gemini ({settings.gemini_vision_model}) — watching the full mp4…"
+        )
+        try:
+            visual_text = analyze_video_with_gemini(
+                cached,
+                duration=duration,
+                caption=caption,
+            )
+        except Exception as exc:
+            notes.append(f"Vision: Gemini failed — {_short_vision_error(exc)}")
+            visual_text = None
+        if visual_text:
+            notes.append("Vision: Gemini succeeded — brief added from the full video.")
+            return visual_text
+        notes.append("Vision: Gemini produced no recipe content.")
+
+    if try_gemini and not cached:
+        notes.append("Vision: Gemini skipped — no cached video file to analyze.")
+
+    notes.append(
+        "Vision: frame stills (Bedrock Nova) — used because Gemini did not return a brief."
+        if try_gemini
+        else "Vision: frame stills (Bedrock Nova)."
+    )
     frames = get_cached_frames(source_url)
-    if not frames:
+    if not frames and cached:
         ensure_video_cached(
             source_url,
             _ytdlp_options,
@@ -420,6 +481,8 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
     visual_text: Optional[str] = None
     max_audio = 90.0 if source_type in SHORT_FORM_PLATFORMS else None
 
+    caption_for_vision = description or subtitle_text
+
     if need_audio and need_visual:
         audio_notes: list[str] = []
         visual_notes: list[str] = []
@@ -431,7 +494,13 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
                 video_path=cached_video,
                 max_audio_seconds=max_audio,
             )
-            visual_future = pool.submit(_run_visual_step, source_url, visual_notes, duration)
+            visual_future = pool.submit(
+                _run_visual_step,
+                source_url,
+                visual_notes,
+                duration,
+                caption_for_vision,
+            )
             transcript = audio_future.result()
             visual_text = visual_future.result()
         notes.extend(audio_notes)
@@ -446,7 +515,7 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
             max_audio_seconds=max_audio,
         )
     elif need_visual:
-        visual_text = _run_visual_step(source_url, notes, duration)
+        visual_text = _run_visual_step(source_url, notes, duration, caption_for_vision)
 
     raw_text = _merge_text_parts(title, description, subtitle_text, transcript, visual_text)
     if not raw_text and metadata_error is not None:

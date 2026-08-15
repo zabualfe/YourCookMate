@@ -24,6 +24,7 @@ class AdminFeatureFlagsUpdate(BaseModel):
     social_ingest: Optional[bool] = None
     community: Optional[bool] = None
     instacart: Optional[bool] = None
+    aws_transcribe: Optional[bool] = None
 
 
 class AdminStatusResponse(BaseModel):

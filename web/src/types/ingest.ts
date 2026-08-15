@@ -38,6 +38,7 @@ export interface ReviewDraft {
   usedAi: boolean
   sourceType?: string
   sourceUrl?: string
+  extractionNotes?: string[]
 }
 
 export function videoPlatformLabel(sourceType: string): string {

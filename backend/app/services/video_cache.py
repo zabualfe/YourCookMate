@@ -10,7 +10,14 @@ from typing import Callable, Optional
 
 from app.config import settings
 from app.services.recipe_icons import uploads_root
-from app.services.video_frames import download_video, extract_evenly_spaced_frames, ffmpeg_executable
+from app.services.video_frames import (
+    download_video,
+    extract_cooking_frames,
+    ffmpeg_executable,
+    probe_video_duration,
+    sample_times_across_duration,
+    target_sample_count,
+)
 
 _VIDEO_SUFFIXES = {".mp4", ".webm", ".mkv", ".mov"}
 _META_FILE = "meta.json"
@@ -45,26 +52,75 @@ def get_cached_frames(source_url: str) -> list[Path]:
     return sorted(frames_dir.glob("frame_*.jpg"))
 
 
-def _write_meta(cache_dir: Path, *, duration: Optional[float], frame_count: int) -> None:
+def _write_meta(
+    cache_dir: Path,
+    *,
+    duration: Optional[float],
+    frame_count: int,
+    frame_times: Optional[list[float]] = None,
+    sample_fps: Optional[float] = None,
+    sample_mode: str = "dense_scene",
+    quality: Optional[str] = None,
+) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
-    (cache_dir / _META_FILE).write_text(
-        json.dumps({"duration": duration, "frame_count": frame_count}),
-        encoding="utf-8",
-    )
+    payload: dict = {
+        "duration": duration,
+        "frame_count": frame_count,
+        "sample_mode": sample_mode,
+    }
+    if sample_fps is not None:
+        payload["sample_fps"] = float(sample_fps)
+    if quality:
+        payload["quality"] = quality
+    if frame_times is not None:
+        payload["frame_times"] = [round(float(t), 3) for t in frame_times]
+    (cache_dir / _META_FILE).write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _read_meta(source_url: str) -> dict:
+    meta_path = get_cache_dir(source_url) / _META_FILE
+    if not meta_path.is_file():
+        return {}
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 def get_cached_duration(source_url: str) -> Optional[float]:
-    meta_path = get_cache_dir(source_url) / _META_FILE
-    if not meta_path.is_file():
-        return None
-    try:
-        data = json.loads(meta_path.read_text(encoding="utf-8"))
-        duration = data.get("duration")
-        if isinstance(duration, (int, float)) and duration > 0:
-            return float(duration)
-    except Exception:
-        return None
+    duration = _read_meta(source_url).get("duration")
+    if isinstance(duration, (int, float)) and duration > 0:
+        return float(duration)
     return None
+
+
+def get_cached_frame_times(source_url: str) -> list[float]:
+    """Return seek times aligned with get_cached_frames(), or synthesize if missing."""
+    frames = get_cached_frames(source_url)
+    if not frames:
+        return []
+
+    meta = _read_meta(source_url)
+    raw_times = meta.get("frame_times")
+    times: list[float] = []
+    if isinstance(raw_times, list):
+        for value in raw_times:
+            try:
+                times.append(float(value))
+            except (TypeError, ValueError):
+                continue
+
+    if len(times) == len(frames):
+        return times
+
+    duration = meta.get("duration")
+    if not isinstance(duration, (int, float)) or duration <= 0:
+        video = get_cached_video(source_url)
+        duration = probe_video_duration(video) if video else None
+    if not isinstance(duration, (int, float)) or duration <= 0:
+        duration = float(len(frames) * 2)
+    return sample_times_across_duration(float(duration), len(frames))
 
 
 def ensure_video_cached(
@@ -88,22 +144,62 @@ def ensure_video_cached(
             video_path = cache_dir / f"video{downloaded.suffix.lower()}"
             shutil.copy2(downloaded, video_path)
 
-    target_frames = frame_count or settings.social_step_max_frames
+    if duration is None or duration <= 0:
+        duration = probe_video_duration(video_path)
+
+    from app.services.vision_quality import resolve_vision_quality
+
+    profile = resolve_vision_quality()
+    sample_fps = float(profile.sample_fps)
+    target_frames = frame_count or target_sample_count(
+        duration,
+        fps=sample_fps,
+        max_frames=profile.max_frames,
+    )
     existing_frames = get_cached_frames(source_url)
-    if len(existing_frames) < target_frames:
+    meta = _read_meta(source_url)
+    existing_times = meta.get("frame_times") if isinstance(meta.get("frame_times"), list) else []
+    existing_mode = str(meta.get("sample_mode") or "")
+    existing_quality = str(meta.get("quality") or "")
+    # Re-extract when short/outdated or quality preset changed.
+    needs_extract = (
+        len(existing_frames) < target_frames
+        or len(existing_times) != len(existing_frames)
+        or existing_mode not in {"dense_scene", "dense"}
+        or float(meta.get("sample_fps") or 0) + 1e-6 < sample_fps
+        or existing_quality != profile.name
+    )
+
+    frame_times: list[float] = []
+    if needs_extract:
         frames_dir = cache_dir / _FRAMES_DIR
+        if frames_dir.exists():
+            shutil.rmtree(frames_dir)
         frames_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory() as tmp:
-            extracted = extract_evenly_spaced_frames(
+            extracted = extract_cooking_frames(
                 video_path,
                 Path(tmp),
-                target_frames,
-                duration,
+                duration=duration,
+                fps=sample_fps,
+                max_frames=target_frames,
+                scene_threshold=float(profile.scene_threshold),
             )
-            for index, frame in enumerate(extracted, start=1):
+            for index, (frame, pts) in enumerate(extracted, start=1):
                 shutil.copy2(frame, frames_dir / f"frame_{index:03d}.jpg")
+                frame_times.append(float(pts))
+    else:
+        frame_times = [float(t) for t in existing_times]
 
-    _write_meta(cache_dir, duration=duration, frame_count=target_frames)
+    _write_meta(
+        cache_dir,
+        duration=duration,
+        frame_count=len(frame_times) or target_frames,
+        frame_times=frame_times or None,
+        sample_fps=sample_fps,
+        sample_mode="dense_scene",
+        quality=profile.name,
+    )
     return video_path
 
 
@@ -132,36 +228,14 @@ def extract_audio_from_video(video_path: Path, output_path: Path) -> bool:
 
 
 def transcribe_cached_video(video_path: Path) -> Optional[str]:
-    if not settings.openai_api_key:
-        return None
-
     from app.services.feature_flags import ai_allowed
+    from app.services.transcription import resolve_transcribe_provider, transcribe_audio_file
 
-    if not ai_allowed():
-        return None
-
-    try:
-        from openai import OpenAI
-    except ImportError:
+    if not ai_allowed() or resolve_transcribe_provider() is None:
         return None
 
     with tempfile.TemporaryDirectory() as tmp:
         audio_path = Path(tmp) / "audio.m4a"
         if not extract_audio_from_video(video_path, audio_path):
             return None
-
-        try:
-            client = OpenAI(api_key=settings.openai_api_key)
-            with audio_path.open("rb") as audio_file:
-                result = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    response_format="text",
-                )
-        except Exception:
-            return None
-
-        text = (result if isinstance(result, str) else getattr(result, "text", "")).strip()
-        if len(text) < 12:
-            return None
-        return text
+        return transcribe_audio_file(audio_path)

@@ -9,6 +9,8 @@ class Ingredient(BaseModel):
     name: str
     quantity: str = ""
     group: str = "Main"
+    # Seconds into the source video when this ingredient first appears / is needed.
+    appears_at_seconds: Optional[float] = None
 
 
 class RecipeStep(BaseModel):
@@ -19,6 +21,9 @@ class RecipeStep(BaseModel):
     equipment: List[str] = Field(default_factory=list)
     image_url: Optional[str] = None
     clip_url: Optional[str] = None
+    # Span of the source video where this step is demonstrated (unlisted sync UI).
+    video_start_seconds: Optional[float] = None
+    video_end_seconds: Optional[float] = None
 
 
 class ParsedRecipe(BaseModel):

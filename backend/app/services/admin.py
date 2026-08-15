@@ -14,7 +14,7 @@ FLAG_METADATA: dict[str, dict[str, str]] = {
     },
     "ai": {
         "label": "AI",
-        "description": "OpenAI parsing, transcription, and video analysis",
+        "description": "Recipe parsing, transcription, and video analysis",
     },
     "social_ingest": {
         "label": "Video import",
@@ -27,6 +27,10 @@ FLAG_METADATA: dict[str, dict[str, str]] = {
     "instacart": {
         "label": "Instacart",
         "description": "Instacart shopping and account linking UI",
+    },
+    "aws_transcribe": {
+        "label": "Amazon Transcribe",
+        "description": "Use AWS Transcribe for video speech-to-text (requires S3 temp bucket; falls back to Whisper when off)",
     },
 }
 

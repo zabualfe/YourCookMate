@@ -19,7 +19,7 @@ export default function TabLayout() {
         },
         headerShadowVisible: false,
         headerTitle: () => <BrandLogo size="sm" />,
-        tabBarActiveTintColor: colors.brand600,
+        tabBarActiveTintColor: colors.brand700,
         tabBarInactiveTintColor: colors.stone500,
         tabBarStyle: {
           backgroundColor: colors.white,

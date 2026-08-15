@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Optional
+
+from pydantic import BaseModel
 
 
 class FeaturesResponse(BaseModel):
@@ -12,6 +14,7 @@ class FeaturesResponse(BaseModel):
     instacart: bool = False
     instacart_shopping: bool = False
     instacart_connect: bool = False
-    aws_api_url: str | None = None
+    aws_transcribe: bool = False
+    aws_api_url: Optional[str] = None
 
     model_config = {"extra": "ignore"}

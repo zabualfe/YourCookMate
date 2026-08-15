@@ -10,7 +10,6 @@ import {
 } from 'react-native'
 import { useAuth } from '@/context/AuthContext'
 import { InstacartConnectCard } from '@/components/InstacartConnectCard'
-import { BrandLogo } from '@/components/BrandLogo'
 import { colors, commonStyles, fonts, radii, spacing } from '@/constants/theme'
 
 export default function ProfileScreen() {
@@ -27,10 +26,13 @@ export default function ProfileScreen() {
   if (!isAuthenticated || !user) {
     return (
       <View style={[commonStyles.screen, styles.center]}>
-        <BrandLogo />
+        <Text style={styles.brand}>Your Cook Mate</Text>
         <Text style={styles.emptyTitle}>Sign in to view your profile</Text>
-        <Pressable onPress={() => router.push('/login')} style={styles.signInBtn}>
-          <Text style={commonStyles.primaryBtnText}>Sign in</Text>
+        <Pressable onPress={() => router.push('/register')} style={styles.signInBtn}>
+          <Text style={commonStyles.primaryBtnText}>Create account</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/login')} style={styles.secondaryBtn}>
+          <Text style={commonStyles.secondaryBtnText}>Sign in</Text>
         </Pressable>
       </View>
     )
@@ -77,6 +79,11 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     gap: spacing.md,
   },
+  brand: {
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 22,
+    color: colors.brand700,
+  },
   emptyTitle: {
     fontFamily: fonts.sans,
     fontSize: 16,
@@ -85,11 +92,23 @@ const styles = StyleSheet.create({
   },
   signInBtn: {
     marginTop: spacing.lg,
-    minWidth: 200,
+    minWidth: 220,
     minHeight: 48,
-    backgroundColor: colors.brand600,
-    borderRadius: radii.xxl,
+    backgroundColor: colors.brand700,
+    borderRadius: radii.lg,
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryBtn: {
+    minWidth: 220,
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.stone200,
+    borderRadius: radii.lg,
+    backgroundColor: colors.white,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',

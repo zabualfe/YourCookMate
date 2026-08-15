@@ -4,9 +4,11 @@ import { Layout } from '../components/Layout'
 import { RecipeIcon } from '../components/RecipeIcon'
 import { RecipeNutritionInfo } from '../components/RecipeNutritionInfo'
 import { RecipeSourceLink } from '../components/RecipeSourceLink'
+import { SharedVideoRecipeView } from '../components/SharedVideoRecipeView'
 import { ShopInstacartButton } from '../components/ShopInstacartButton'
 import { getSharedRecipe, saveSharedRecipe } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { isVideoSourceType } from '../lib/recipeTimestamps'
 
 export function SharedRecipePage() {
   const { slug } = useParams<{ slug: string }>()
@@ -54,59 +56,95 @@ export function SharedRecipePage() {
   }
 
   const needsVerify = isAuthenticated && user && !user.email_verified
+  const useVideoLayout = isVideoSourceType(data.source_type) && !!data.source_url
+
+  const addRecipeButton = (() => {
+    const className =
+      'inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:cursor-wait disabled:opacity-60'
+
+    if (!isAuthenticated) {
+      return (
+        <Link
+          to={`/login?redirect=${encodeURIComponent(`/r/${slug}`)}`}
+          className={className}
+        >
+          + Add Recipe
+        </Link>
+      )
+    }
+
+    if (needsVerify) {
+      return (
+        <Link
+          to={`/verify-email?redirect=${encodeURIComponent(`/r/${slug}`)}`}
+          className={className}
+        >
+          + Add Recipe
+        </Link>
+      )
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => saveMutation.mutate()}
+        disabled={saveMutation.isPending}
+        className={className}
+      >
+        {saveMutation.isPending ? 'Adding…' : '+ Add Recipe'}
+      </button>
+    )
+  })()
+
+  const actions = (
+    <>
+      {addRecipeButton}
+
+      {!useVideoLayout && (
+        <Link
+          to={`/r/${slug}/cook`}
+          className="inline-flex min-h-11 items-center rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+        >
+          Start cooking
+        </Link>
+      )}
+
+      <ShopInstacartButton shareSlug={slug} />
+    </>
+  )
+
+  if (useVideoLayout) {
+    return (
+      <Layout>
+        <SharedVideoRecipeView
+          slug={slug}
+          data={data}
+          actions={actions}
+          saveError={
+            saveMutation.error ? (saveMutation.error as Error).message : null
+          }
+        />
+      </Layout>
+    )
+  }
 
   return (
     <Layout>
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <p className="text-sm text-stone-500">Shared by {data.author_name}</p>
-        <div className="mt-3 flex items-start gap-4">
-          <RecipeIcon recipeId={data.slug} iconUrl={data.icon_url} size="lg" />
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-stone-900">{data.title}</h1>
-            {data.source_url && <RecipeSourceLink url={data.source_url} className="mt-2" />}
-            <p className="mt-1 text-stone-600">{data.step_count} steps</p>
-            <RecipeNutritionInfo recipe={data.recipe} className="mt-3" />
+            <p className="text-sm text-stone-500">Shared by {data.author_name}</p>
+            <div className="mt-3 flex items-start gap-4">
+              <RecipeIcon recipeId={data.slug} iconUrl={data.icon_url} size="lg" />
+              <div>
+                <h1 className="text-3xl font-bold text-stone-900">{data.title}</h1>
+                {data.source_url && <RecipeSourceLink url={data.source_url} className="mt-2" />}
+                <p className="mt-1 text-stone-600">{data.step_count} steps</p>
+                <RecipeNutritionInfo recipe={data.recipe} className="mt-3" />
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            to={`/r/${slug}/cook`}
-            className="inline-flex min-h-12 items-center rounded-2xl bg-brand-600 px-8 py-3 font-semibold text-white transition hover:bg-brand-700"
-          >
-            Start cooking
-          </Link>
-
-          <ShopInstacartButton shareSlug={slug} />
-
-          {!isAuthenticated && (
-            <Link
-              to={`/login?redirect=${encodeURIComponent(`/r/${slug}`)}`}
-              className="inline-flex min-h-12 items-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-medium text-stone-700 hover:bg-stone-50"
-            >
-              Sign in to save
-            </Link>
-          )}
-
-          {isAuthenticated && !needsVerify && (
-            <button
-              type="button"
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending}
-              className="inline-flex min-h-12 items-center rounded-2xl border border-brand-200 bg-brand-50 px-6 py-3 text-sm font-semibold text-brand-800 hover:bg-brand-100 disabled:opacity-50"
-            >
-              {saveMutation.isPending ? 'Saving…' : 'Save to my library'}
-            </button>
-          )}
-
-          {needsVerify && (
-            <Link
-              to={`/verify-email?redirect=${encodeURIComponent(`/r/${slug}`)}`}
-              className="inline-flex min-h-12 items-center rounded-2xl border border-amber-200 bg-amber-50 px-6 py-3 text-sm font-medium text-amber-900"
-            >
-              Verify email to save
-            </Link>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-3">{actions}</div>
         </div>
 
         {saveMutation.error && (

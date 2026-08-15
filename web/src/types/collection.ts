@@ -33,6 +33,7 @@ export interface CollectionDetailResponse {
 
 export interface ShareResponse {
   is_public: boolean
+  shared_to_community?: boolean
   share_slug?: string | null
   share_url?: string | null
 }

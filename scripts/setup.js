@@ -24,19 +24,81 @@ function step(label) {
   console.log(`\n── ${label} ──`)
 }
 
+function parsePythonVersion(text) {
+  const match = String(text || '').match(/Python\s+(\d+)\.(\d+)\.(\d+)/i)
+  if (!match) return null
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) }
+}
+
+function isAtLeast(version, major, minor) {
+  if (!version) return false
+  if (version.major !== major) return version.major > major
+  return version.minor >= minor
+}
+
+function pythonVersion(command, args = []) {
+  const result = spawnSync(command, [...args, '--version'], { encoding: 'utf8' })
+  if (result.error || result.status !== 0) return null
+  return parsePythonVersion(`${result.stdout || ''}${result.stderr || ''}`)
+}
+
+function resolvePython() {
+  // Prefer an explicit 3.12+ binary. Bare `python3` on macOS often points at
+  // Apple's Command Line Tools Python 3.9, which is too old for this project.
+  const candidates = isWin
+    ? [
+        { command: 'py', args: ['-3.12'], label: 'py -3.12' },
+        { command: 'py', args: ['-3'], label: 'py -3' },
+        { command: 'python', args: [], label: 'python' },
+      ]
+    : [
+        { command: 'python3.12', args: [], label: 'python3.12' },
+        { command: 'python3.13', args: [], label: 'python3.13' },
+        { command: 'python3.14', args: [], label: 'python3.14' },
+        { command: 'python3', args: [], label: 'python3' },
+      ]
+
+  for (const candidate of candidates) {
+    const version = pythonVersion(candidate.command, candidate.args)
+    if (isAtLeast(version, 3, 12)) {
+      return { ...candidate, version }
+    }
+  }
+  return null
+}
+
 step('Checking Python')
-const pythonCheck = spawnSync(isWin ? 'python' : 'python3', ['--version'], { encoding: 'utf8' })
-if (pythonCheck.status !== 0) {
-  console.error('Python 3 is required. Install from https://python.org')
+const resolved = resolvePython()
+if (!resolved) {
+  console.error('Python 3.12+ is required (Apple\'s /usr/bin/python3 is often 3.9 and will not work).')
+  console.error('Install with: brew install python@3.12')
+  console.error('Then re-run: npm run setup')
   process.exit(1)
 }
-console.log(pythonCheck.stdout.trim() || pythonCheck.stderr.trim())
+console.log(`Using ${resolved.label} → Python ${resolved.version.major}.${resolved.version.minor}.${resolved.version.patch}`)
 
-const python = isWin ? 'python' : 'python3'
+const existingVenvVersion = fs.existsSync(venvPython()) ? pythonVersion(venvPython()) : null
+const venvNeedsRebuild =
+  !existingVenvVersion || !isAtLeast(existingVenvVersion, 3, 12)
 
 step('Backend virtualenv')
-if (!fs.existsSync(venvDir)) {
-  run(`${python} -m venv .venv`, { cwd: backend })
+if (venvNeedsRebuild) {
+  if (fs.existsSync(venvDir)) {
+    console.log(
+      `Recreating .venv (was Python ${
+        existingVenvVersion
+          ? `${existingVenvVersion.major}.${existingVenvVersion.minor}.${existingVenvVersion.patch}`
+          : 'unknown'
+      }, need 3.12+)`,
+    )
+    fs.rmSync(venvDir, { recursive: true, force: true })
+  }
+  const venvArgs = [...resolved.args, '-m', 'venv', '.venv']
+  run(`${resolved.command} ${venvArgs.join(' ')}`, { cwd: backend })
+} else {
+  console.log(
+    `Reusing existing .venv (Python ${existingVenvVersion.major}.${existingVenvVersion.minor}.${existingVenvVersion.patch})`,
+  )
 }
 
 step('Backend dependencies')

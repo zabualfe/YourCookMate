@@ -118,12 +118,12 @@ const styles = StyleSheet.create({
   valid: {
     borderWidth: 1,
     borderColor: '#86efac',
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.brand50,
   },
   loading: {
     borderWidth: 1,
     borderColor: '#bbf7d0',
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.brand50,
     justifyContent: 'flex-start',
   },
   loadingText: { fontSize: 13, color: '#166534', marginLeft: 4 },

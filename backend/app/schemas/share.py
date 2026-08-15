@@ -13,6 +13,7 @@ class ShareRequest(BaseModel):
 
 class ShareResponse(BaseModel):
     is_public: bool
+    shared_to_community: bool = False
     share_slug: Optional[str] = None
     share_url: Optional[str] = None
 

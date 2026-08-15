@@ -22,6 +22,7 @@ def build_features_response() -> FeaturesResponse:
         instacart=instacart_on,
         instacart_shopping=instacart_on and instacart_shopping_available(),
         instacart_connect=instacart_on and connect_is_configured(),
+        aws_transcribe=flags.get("aws_transcribe", False),
         aws_api_url=aws_base,
     )
 
@@ -58,3 +59,8 @@ def require_community_enabled() -> None:
 
 def ai_allowed() -> bool:
     return is_feature_enabled("ai")
+
+
+def aws_transcribe_allowed() -> bool:
+    """Amazon Transcribe requires both AI and the aws_transcribe flag."""
+    return is_feature_enabled("ai") and is_feature_enabled("aws_transcribe")

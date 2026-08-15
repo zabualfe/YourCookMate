@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  /* Fresh kitchen — emerald primary, amber accent, cool mint surfaces */
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-300: #6ee7b7;
-  --color-brand-400: #34d399;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
-  --color-brand-800: #065f46;
-  --color-accent-50: #fffbeb;
-  --color-accent-100: #fef3c7;
-  --color-accent-200: #fde68a;
-  --color-accent-500: #d97706;
-  --color-accent-600: #b45309;
-  --color-accent-700: #92400e;
-  --color-surface: #f0fdf4;
-  --color-surface-alt: #ecfdf5;
-  --font-sans: "Nunito Sans", system-ui, sans-serif;
-  --font-display: "Nunito", system-ui, sans-serif;
+  /* Kitchen charcoal + forest green — quiet, not minty */
+  --color-brand-50: #f2f7f4;
+  --color-brand-100: #dcece3;
+  --color-brand-200: #b8d9c6;
+  --color-brand-300: #86bc9e;
+  --color-brand-400: #549e78;
+  --color-brand-500: #35805c;
+  --color-brand-600: #266849;
+  --color-brand-700: #1f533c;
+  --color-brand-800: #1a4331;
+  --color-accent-50: #faf6f1;
+  --color-accent-100: #f0e6d8;
+  --color-accent-200: #e0ccb0;
+  --color-accent-500: #a16207;
+  --color-accent-600: #854d0e;
+  --color-accent-700: #713f12;
+  --color-surface: #fafaf8;
+  --color-surface-alt: #f3f3f0;
+  --font-sans: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Outfit", "Avenir Next", "Segoe UI", system-ui, sans-serif;
 }
 
 @layer base {

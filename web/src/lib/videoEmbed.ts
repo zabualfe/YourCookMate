@@ -47,8 +47,13 @@ function youtubePreview(parsed: URL): Pick<VideoEmbedPreview, 'embedUrl' | 'thum
     }
   }
   if (!id) return null
+  const params = new URLSearchParams({
+    rel: '0',
+    enablejsapi: '1',
+    playsinline: '1',
+  })
   return {
-    embedUrl: `https://www.youtube.com/embed/${id}?rel=0`,
+    embedUrl: `https://www.youtube.com/embed/${id}?${params.toString()}`,
     thumbnailUrl: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
   }
 }
@@ -63,11 +68,36 @@ function instagramPreview(parsed: URL): Pick<VideoEmbedPreview, 'embedUrl' | 'th
   }
 }
 
+function tiktokVideoId(parsed: URL): string | null {
+  const path = parsed.pathname
+  const patterns = [/\/video\/(\d+)/, /\/share\/video\/(\d+)/, /\/player\/v1\/(\d+)/, /\/embed\/v2\/(\d+)/]
+  for (const pattern of patterns) {
+    const match = path.match(pattern)
+    if (match?.[1]) return match[1]
+  }
+  return null
+}
+
 function tiktokPreview(parsed: URL): Pick<VideoEmbedPreview, 'embedUrl' | 'thumbnailUrl'> | null {
-  const match = parsed.pathname.match(/\/video\/(\d+)/)
-  if (!match) return null
+  const id = tiktokVideoId(parsed)
+  if (!id) return null
+  // Player Kit embed — video-only chrome (no caption/music card).
+  const params = new URLSearchParams({
+    music_info: '0',
+    description: '0',
+    autoplay: '0',
+    loop: '0',
+    rel: '0',
+    controls: '1',
+    progress_bar: '1',
+    play_button: '1',
+    volume_control: '1',
+    fullscreen_button: '1',
+    timestamp: '1',
+    closed_caption: '0',
+  })
   return {
-    embedUrl: `https://www.tiktok.com/embed/v2/${match[1]}`,
+    embedUrl: `https://www.tiktok.com/player/v1/${id}?${params.toString()}`,
     thumbnailUrl: null,
   }
 }

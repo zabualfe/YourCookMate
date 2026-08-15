@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   ingredientsBtn: {
     textAlign: 'right',
     fontFamily: fonts.displaySemiBold,
-    color: colors.brand600,
+    color: colors.brand700,
     fontSize: 15,
   },
   progressRow: {
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.stone200,
   },
-  progressSegmentActive: { backgroundColor: colors.brand600 },
+  progressSegmentActive: { backgroundColor: colors.brand700 },
   stepLabel: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

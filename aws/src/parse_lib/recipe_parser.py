@@ -9,23 +9,33 @@ import boto3
 
 from ingest_lib.config import settings
 
-SYSTEM_PROMPT = """You are a recipe parser for Your Cook Mate. Convert raw recipe text into structured JSON for a step-by-step cooking app with one clear action per step.
+SYSTEM_PROMPT = """You are a precise recipe parser for Your Cook Mate. Convert raw recipe text into structured JSON for a step-by-step cooking app.
 
-Input may come from TikTok, Instagram, YouTube, or other cooking videos: informal captions, hashtags, emoji, or spoken audio transcripts. Ignore hashtags, @mentions, and social noise. Infer ingredients and cooking steps even when sections are not explicitly labeled (e.g. "you need:" or a list of actions without headers).
+Input may come from TikTok, Instagram, YouTube, or other cooking videos: captions, hashtags, emoji, spoken audio transcripts WITH TIMESTAMPS like [0:12], and visual frame notes with approximate times. Ignore hashtags, @mentions, and social noise.
+
+PRECISION RULES (critical):
+1. Prefer timestamped spoken lines and timed visual notes over guessing.
+2. Parse [m:ss], [mm:ss], (0:45), "at 0:30", and "12s" cues into float seconds (0:45 → 45.0).
+3. Each step must be ONE discrete cooking action happening at a specific moment in the video — split compound sentences.
+4. Do NOT evenly invent times when better cues exist. Only estimate missing times by interpolating between known anchors.
+5. ingredients_used must use EXACT ingredient names from the ingredients list (same spelling).
+6. appears_at_seconds for an ingredient = the first moment it is mentioned, shown, or used (usually that step's video_start_seconds).
 
 Rules for steps:
-- One clear action per step; break compound instructions apart
-- Use short imperative sentences ("Dice the onion into ½-inch pieces")
-- Include implicit steps (preheat oven, rest meat, etc.)
+- Short imperative sentences ("Dice the onion into ½-inch pieces")
+- Include implicit steps only when clearly needed (preheat, rest, etc.)
 - Cap each step at ~2 sentences
-- Add duration_minutes when the step mentions time
-- Link ingredients_used to ingredient names from the list
+- duration_minutes = cooking/wait time mentioned in the step (minutes), NOT video time
 - List equipment when relevant
 - Always return at least one step when any cooking action is present
+- video_start_seconds / video_end_seconds: when that action is spoken or visually demonstrated
+- Steps in chronological order; step N video_end_seconds should equal step N+1 video_start_seconds when contiguous
+- Keep all times within [0, video_duration] when duration is provided
+- For short-form videos (TikTok/Reels, often <90s), use tight ranges — typical steps last 2–12 seconds
 
-Nutrition and allergens (estimates only — infer from ingredients and typical portions):
-- calories_per_serving: estimated kcal for one serving (integer). Use null if servings or ingredients are too vague to estimate reasonably.
-- allergens: list likely allergens present in the recipe. Use lowercase canonical names from this set only when applicable: dairy, eggs, fish, shellfish, tree nuts, peanuts, wheat, gluten, soy, sesame. Omit items that are not present; use [] when none are likely.
+Nutrition and allergens (estimates only):
+- calories_per_serving: estimated kcal for one serving (integer), or null if too vague
+- allergens: lowercase from this set only when present: dairy, eggs, fish, shellfish, tree nuts, peanuts, wheat, gluten, soy, sesame; else []
 
 Return ONLY valid JSON matching this schema:
 {
@@ -35,8 +45,8 @@ Return ONLY valid JSON matching this schema:
   "cook_time_minutes": number or null,
   "calories_per_serving": number or null,
   "allergens": ["string"],
-  "ingredients": [{"name": "string", "quantity": "string", "group": "string"}],
-  "steps": [{"order": 1, "instruction": "string", "duration_minutes": number or null, "ingredients_used": ["string"], "equipment": ["string"]}]
+  "ingredients": [{"name": "string", "quantity": "string", "group": "string", "appears_at_seconds": number or null}],
+  "steps": [{"order": 1, "instruction": "string", "duration_minutes": number or null, "ingredients_used": ["string"], "equipment": ["string"], "video_start_seconds": number or null, "video_end_seconds": number or null}]
 }"""
 
 _HASHTAG_ONLY = re.compile(r"^(?:#\w+\s*)+$")
@@ -55,9 +65,15 @@ class Ingredient:
     name: str
     quantity: str = ""
     group: str = "Main"
+    appears_at_seconds: Optional[float] = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "quantity": self.quantity, "group": self.group}
+        return {
+            "name": self.name,
+            "quantity": self.quantity,
+            "group": self.group,
+            "appears_at_seconds": self.appears_at_seconds,
+        }
 
 
 @dataclass
@@ -67,6 +83,8 @@ class RecipeStep:
     duration_minutes: Optional[int] = None
     ingredients_used: list[str] = field(default_factory=list)
     equipment: list[str] = field(default_factory=list)
+    video_start_seconds: Optional[float] = None
+    video_end_seconds: Optional[float] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -77,6 +95,8 @@ class RecipeStep:
             "equipment": self.equipment,
             "image_url": None,
             "clip_url": None,
+            "video_start_seconds": self.video_start_seconds,
+            "video_end_seconds": self.video_end_seconds,
         }
 
 
@@ -300,12 +320,22 @@ def _optional_int(value: Any) -> Optional[int]:
         return None
 
 
+def _optional_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _recipe_from_dict(data: dict[str, Any]) -> ParsedRecipe:
     ingredients = [
         Ingredient(
             name=str(item.get("name", "")).strip(),
             quantity=str(item.get("quantity", "")),
             group=str(item.get("group", "Main") or "Main"),
+            appears_at_seconds=_optional_float(item.get("appears_at_seconds")),
         )
         for item in (data.get("ingredients") or [])
         if str(item.get("name", "")).strip()
@@ -317,6 +347,8 @@ def _recipe_from_dict(data: dict[str, Any]) -> ParsedRecipe:
             duration_minutes=_optional_int(step.get("duration_minutes")),
             ingredients_used=[str(x) for x in (step.get("ingredients_used") or []) if x],
             equipment=[str(x) for x in (step.get("equipment") or []) if x],
+            video_start_seconds=_optional_float(step.get("video_start_seconds")),
+            video_end_seconds=_optional_float(step.get("video_end_seconds")),
         )
         for idx, step in enumerate(data.get("steps") or [], start=1)
         if str(step.get("instruction", "")).strip()
@@ -351,7 +383,7 @@ def _bedrock_parse(cleaned: str) -> Optional[ParsedRecipe]:
         modelId=settings.bedrock_parse_model,
         system=[{"text": SYSTEM_PROMPT}],
         messages=[{"role": "user", "content": [{"text": cleaned}]}],
-        inferenceConfig={"maxTokens": 4096, "temperature": 0.3},
+        inferenceConfig={"maxTokens": 4096, "temperature": 0.1},
     )
     text_parts: list[str] = []
     for block in response.get("output", {}).get("message", {}).get("content", []):
@@ -364,7 +396,11 @@ def _bedrock_parse(cleaned: str) -> Optional[ParsedRecipe]:
     return _recipe_from_dict(data)
 
 
-def parse_recipe(raw_text: str) -> tuple[ParsedRecipe, bool]:
+def parse_recipe(
+    raw_text: str,
+    *,
+    video_duration: Optional[float] = None,
+) -> tuple[ParsedRecipe, bool]:
     cleaned = _preprocess_raw_text(raw_text)
     if not cleaned:
         return _heuristic_parse(raw_text), False
@@ -372,8 +408,19 @@ def parse_recipe(raw_text: str) -> tuple[ParsedRecipe, bool]:
     if not settings.feature_ai_enabled:
         return _heuristic_parse(cleaned), False
 
+    user_content = cleaned
+    if video_duration and video_duration > 0:
+        user_content = (
+            f"Source video duration: {float(video_duration):.1f} seconds "
+            f"({int(video_duration // 60)}:{int(video_duration % 60):02d}).\n"
+            "Map EVERY step and ingredient to this timeline with precise seconds.\n"
+            "Prefer [m:ss] cues in Spoken instructions and visual frame notes over guessing.\n"
+            "ingredients_used must match ingredient names exactly.\n\n"
+            f"{cleaned}"
+        )
+
     try:
-        recipe = _bedrock_parse(cleaned)
+        recipe = _bedrock_parse(user_content)
         if recipe is None or not _recipe_is_usable(recipe):
             return _heuristic_parse(cleaned), False
         return _normalize_nutrition(recipe), True

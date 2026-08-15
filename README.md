@@ -121,6 +121,9 @@ https://{api-id}.execute-api.us-east-1.amazonaws.com/prod
 | `AWS_RESEND_API_KEY` | Verification email |
 | `AWS_GOOGLE_*`, `AWS_APPLE_*` | OAuth |
 | `AWS_YTDLP_COOKIES_B64` | Instagram import cookies |
+| `AWS_GEMINI_API_KEY` | Google AI Studio key (native video vision on ingest worker) |
+| `AWS_GEMINI_VISION_MODEL` | Optional — default `gemini-3.5-flash` |
+| `AWS_SOCIAL_VISION_PROVIDER` | Optional — `auto` (default), `gemini`, or `frames` |
 
 See [`aws/README.md`](./aws/README.md) for OIDC bootstrap and local `sam deploy`.
 

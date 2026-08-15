@@ -5,3 +5,4 @@ curl_cffi>=0.5.0
 imageio-ffmpeg>=0.5.0
 Pillow>=10.0.0
 boto3>=1.35.0
+google-genai>=1.0.0

@@ -28,6 +28,7 @@ function saveReviewAndGo(
       usedAi: parsed.used_ai,
       sourceType: ingested.source_type,
       sourceUrl: ingested.source_url,
+      extractionNotes: ingested.extraction_notes ?? [],
     }),
   )
   navigate('/new/review')
@@ -253,11 +254,16 @@ export function UploadPage() {
                     <p className="text-xs text-stone-500">by {extracted.author}</p>
                   )}
                   {extracted.extraction_notes.length > 0 && (
-                    <ul className="mt-2 space-y-0.5 text-xs text-stone-600">
-                      {extracted.extraction_notes.map((note) => (
-                        <li key={note}>• {note}</li>
-                      ))}
-                    </ul>
+                    <div className="mt-3 rounded-xl border-2 border-emerald-300 bg-emerald-50 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                        How this was imported
+                      </p>
+                      <ul className="mt-1 space-y-1 text-sm text-emerald-900">
+                        {extracted.extraction_notes.map((note) => (
+                          <li key={note}>• {note}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               </div>

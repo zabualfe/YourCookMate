@@ -40,6 +40,7 @@ class RecipeDetailResponse(BaseModel):
     recipe: ParsedRecipe
     created_at: str
     is_public: bool = False
+    shared_to_community: bool = False
     share_slug: Optional[str] = None
     share_url: Optional[str] = None
     collections: list[RecipeCollectionTag] = []

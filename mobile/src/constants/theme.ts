@@ -1,22 +1,25 @@
 import { StyleSheet, type TextStyle, type ViewStyle } from 'react-native'
 
-/** Fresh kitchen — emerald primary, amber accent, mint surfaces (matches web) */
+/** Kitchen charcoal + forest green — matches web */
 export const colors = {
-  brand50: '#ecfdf5',
-  brand100: '#d1fae5',
-  brand200: '#a7f3d0',
-  brand400: '#34d399',
-  brand: '#059669',
-  brand600: '#059669',
-  brand700: '#047857',
-  brand800: '#065f46',
-  accent50: '#fffbeb',
-  accent100: '#fef3c7',
-  accent500: '#d97706',
-  accent600: '#b45309',
-  accent700: '#92400e',
-  surface: '#f0fdf4',
-  surfaceAlt: '#ecfdf5',
+  brand50: '#f2f7f4',
+  brand100: '#dcece3',
+  brand200: '#b8d9c6',
+  brand300: '#86bc9e',
+  brand400: '#549e78',
+  brand500: '#35805c',
+  brand: '#1f533c',
+  brand600: '#266849',
+  brand700: '#1f533c',
+  brand800: '#1a4331',
+  accent50: '#faf6f1',
+  accent100: '#f0e6d8',
+  accent200: '#e0ccb0',
+  accent500: '#a16207',
+  accent600: '#854d0e',
+  accent700: '#713f12',
+  surface: '#fafaf8',
+  surfaceAlt: '#f3f3f0',
   stone50: '#fafaf9',
   stone100: '#f5f5f4',
   stone200: '#e7e5e4',
@@ -32,8 +35,8 @@ export const colors = {
   red700: '#b91c1c',
   green700: '#15803d',
   // Legacy aliases
-  brandDark: '#047857',
-  accent: '#d97706',
+  brandDark: '#1f533c',
+  accent: '#a16207',
 } as const
 
 export const fonts = {
@@ -45,11 +48,11 @@ export const fonts = {
 } as const
 
 export const radii = {
-  sm: 12,
-  md: 14,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
+  sm: 8,
+  md: 10,
+  lg: 12,
+  xl: 16,
+  xxl: 20,
 } as const
 
 export const spacing = {
@@ -103,8 +106,8 @@ export const commonStyles = StyleSheet.create({
   },
   primaryBtn: {
     minHeight: 48,
-    backgroundColor: colors.brand600,
-    borderRadius: radii.xxl,
+    backgroundColor: colors.brand700,
+    borderRadius: radii.lg,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.xxl,
     alignItems: 'center',
@@ -119,7 +122,7 @@ export const commonStyles = StyleSheet.create({
     minHeight: 48,
     borderWidth: 1,
     borderColor: colors.stone200,
-    borderRadius: radii.xxl,
+    borderRadius: radii.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xxl,
     alignItems: 'center',
@@ -169,7 +172,7 @@ export const commonStyles = StyleSheet.create({
     borderRadius: radii.xxl,
     borderWidth: 1,
     borderColor: colors.brand200,
-    backgroundColor: 'rgba(236, 253, 245, 0.6)',
+    backgroundColor: 'rgba(242, 247, 244, 0.7)',
     padding: spacing.lg,
   },
   emptyState: {
@@ -191,7 +194,7 @@ export const commonStyles = StyleSheet.create({
     marginTop: spacing.md,
     fontFamily: fonts.displaySemiBold,
     fontSize: 15,
-    color: colors.brand600,
+    color: colors.brand700,
   },
 })
 

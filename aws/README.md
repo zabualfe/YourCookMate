@@ -57,6 +57,9 @@ aws cloudformation describe-stacks \
 | `AWS_REGION` | e.g. `us-east-1` |
 | `AWS_DATABASE_URL` | Supabase session pooler URL (same as Render `DATABASE_URL`) |
 | `AWS_FRONTEND_URL` | Vercel URL for CORS, e.g. `https://your-cook-mate.vercel.app` |
+| `AWS_GEMINI_API_KEY` | Google AI Studio API key (paid quota recommended for video) |
+| `AWS_GEMINI_VISION_MODEL` | Optional — default `gemini-3.5-flash` |
+| `AWS_SOCIAL_VISION_PROVIDER` | Optional — `auto` prefers Gemini when key is set |
 
 5. In GitHub → **Settings → Environments**, create **production-aws** (optional approval gate).
 

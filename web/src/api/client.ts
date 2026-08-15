@@ -154,6 +154,7 @@ export interface AppFeatures {
   instacart: boolean
   instacart_shopping: boolean
   instacart_connect: boolean
+  aws_transcribe?: boolean
   /** Set on Vercel via VITE_AWS_API_URL or AWS_API_URL — enables async ingest through API Gateway */
   aws_api_url?: string | null
 }
@@ -293,6 +294,16 @@ export async function deleteRecipe(id: string): Promise<void> {
 
 export async function updateRecipeShare(id: string, enabled: boolean): Promise<ShareResponse> {
   return request(`/recipes/${id}/share`, {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
+export async function updateRecipeCommunity(
+  id: string,
+  enabled: boolean,
+): Promise<ShareResponse> {
+  return request(`/recipes/${id}/community`, {
     method: 'POST',
     body: JSON.stringify({ enabled }),
   })

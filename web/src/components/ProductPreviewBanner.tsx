@@ -60,97 +60,79 @@ export function ProductPreviewBanner() {
 
   return (
     <div className="relative w-full">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -inset-6 rounded-[2rem] bg-gradient-to-br from-brand-200/50 via-brand-50 to-accent-100/50 blur-2xl"
-      />
-
-      <div className="relative flex gap-2 lg:gap-3">
-        <div className="flex min-w-0 flex-[1.65] flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-2xl shadow-stone-900/10 ring-1 ring-stone-900/5">
-          <div className="border-b border-stone-200 bg-white px-5 py-3.5">
-            <span className="block truncate text-base font-semibold text-stone-900">
+      <div className="relative flex flex-col overflow-hidden rounded-xl border border-stone-300/80 bg-stone-200/60 shadow-xl md:flex-row md:gap-px">
+        <div className="flex min-w-0 flex-1 flex-col bg-white md:flex-[1.65]">
+          <div className="flex h-14 items-center border-b border-stone-200 px-4 sm:px-5">
+            <span className="block truncate text-base font-semibold leading-none text-stone-900">
               {DEMO_RECIPE.title}
             </span>
           </div>
 
-          <div className="px-5 pt-5">
-            <div className="flex gap-1">
+          <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+            <div className="flex gap-1" role="presentation">
               {DEMO_RECIPE.steps.map((_, i) => (
                 <div
                   key={i}
-                  className={`h-1 flex-1 rounded-full transition-colors duration-500 ${
-                    i <= currentIndex ? 'bg-brand-600' : 'bg-stone-200'
+                  className={`h-0.5 flex-1 transition-colors duration-500 ${
+                    i <= currentIndex ? 'bg-brand-700' : 'bg-stone-200'
                   }`}
                 />
               ))}
             </div>
           </div>
 
-          <div className="min-h-[260px] flex-1 px-5 py-5 sm:min-h-[300px]">
+          <div className="flex min-h-56 flex-1 px-4 py-4 sm:min-h-64 sm:px-5 sm:py-5 md:min-h-72">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentIndex}
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -16 }}
-                transition={{ duration: 0.25 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? undefined : { opacity: 0, y: -4 }}
+                transition={{ duration: 0.22 }}
               >
-                <p className="mb-3 text-sm font-medium uppercase tracking-wider text-brand-600">
+                <p className="mb-3 text-sm font-medium text-brand-700">
                   Step {currentIndex + 1} of {total}
                 </p>
-                <p className="text-xl font-semibold leading-snug text-stone-900 sm:text-2xl">
+                <p className="font-display text-lg font-medium leading-snug text-stone-900 sm:text-xl md:text-2xl">
                   {step.instruction}
                 </p>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-stone-500 sm:mt-5">
                   {step.duration_minutes != null && (
-                    <span className="inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-white px-3 py-1.5 text-xs font-medium text-accent-600">
-                      Start {step.duration_minutes} min timer
-                    </span>
+                    <span>{step.duration_minutes} min timer</span>
                   )}
                   {step.equipment.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-600"
-                    >
-                      {item}
-                    </span>
+                    <span key={item}>{item}</span>
                   ))}
                 </div>
               </motion.div>
             </AnimatePresence>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-stone-200 bg-white px-5 py-4">
-            <span className="min-h-11 min-w-[96px] rounded-xl border border-stone-200 px-4 py-2.5 text-center text-sm font-semibold text-stone-400">
+          <div className="flex items-center gap-2 border-t border-stone-200 px-4 py-3 sm:px-5 sm:py-4">
+            <span className="inline-flex min-h-11 min-w-24 items-center justify-center rounded-lg border border-stone-200 px-4 py-2.5 text-center text-sm font-semibold text-stone-400">
               Previous
             </span>
-            <span className="min-h-11 flex-1 rounded-xl bg-brand-600 px-4 py-2.5 text-center text-sm font-semibold text-white">
+            <span className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-brand-700 px-4 py-2.5 text-center text-sm font-semibold text-white">
               {currentIndex === total - 1 ? 'Done' : 'Next step'}
             </span>
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-[0.75] flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-2xl shadow-stone-900/10 ring-1 ring-stone-900/5 sm:flex-[0.8] lg:flex-[0.85]">
-          <div className="border-b border-stone-200 px-4 py-3.5 sm:px-5">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-500">
-              Ingredients
-            </h3>
+        <div className="flex min-w-0 flex-col border-t border-stone-200 bg-white md:w-[min(100%,18rem)] md:shrink-0 md:border-t-0 lg:w-[min(100%,20rem)]">
+          <div className="flex h-14 items-center border-b border-stone-200 px-4 sm:px-5">
+            <h3 className="text-base font-semibold leading-none text-stone-500">Ingredients</h3>
           </div>
-          <ul className="min-h-[260px] flex-1 space-y-1.5 overflow-y-auto px-3 py-3 sm:min-h-[300px] sm:px-4 sm:py-4">
+          <ul className="grid grid-cols-2 gap-x-2 gap-y-0.5 px-2 py-2 sm:px-3 sm:py-3 md:grid-cols-1 md:overflow-y-auto">
             {DEMO_RECIPE.ingredients.map((ing) => {
               const active = highlightSet.has(ing.name.toLowerCase())
               return (
                 <li
                   key={ing.name}
-                  className={`flex items-baseline justify-between gap-3 rounded-lg px-2.5 py-2 transition-colors duration-300 sm:px-3 ${
-                    active ? 'bg-brand-50 ring-1 ring-brand-200' : ''
+                  className={`flex items-baseline justify-between gap-2 px-2.5 py-2 transition-colors duration-300 sm:gap-3 sm:px-3 sm:py-2.5 ${
+                    active ? 'bg-brand-50 text-brand-900' : 'text-stone-800'
                   }`}
                 >
-                  <span
-                    className={`text-sm font-medium leading-tight ${
-                      active ? 'text-brand-800' : 'text-stone-800'
-                    }`}
-                  >
+                  <span className={`truncate text-sm leading-tight ${active ? 'font-semibold' : 'font-medium'}`}>
                     {ing.name}
                   </span>
                   <span className="shrink-0 text-xs text-stone-500">{ing.quantity}</span>
@@ -160,10 +142,6 @@ export function ProductPreviewBanner() {
           </ul>
         </div>
       </div>
-
-      <p className="mt-4 text-center text-sm font-medium text-stone-500">
-        Live preview — one step at a time while you cook
-      </p>
     </div>
   )
 }

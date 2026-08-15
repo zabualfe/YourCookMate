@@ -14,6 +14,9 @@ name: CI
 #   AWS_APPLE_CLIENT_ID, AWS_APPLE_IOS_CLIENT_ID (optional)
 #   AWS_RESEND_API_KEY — Resend API key
 #   AWS_YTDLP_COOKIES_B64 — base64 of backend/cookies.social.txt
+#   AWS_GEMINI_API_KEY — Google AI Studio key for native video vision
+#   AWS_GEMINI_VISION_MODEL — optional (default gemini-3.5-flash)
+#   AWS_SOCIAL_VISION_PROVIDER — optional (auto|gemini|frames; default auto)
 #
 # Vercel project env vars:
 #   VITE_API_URL — AWS API Gateway base (auth, recipes, ingest)
@@ -168,6 +171,9 @@ jobs:
           APPLE_CLIENT_ID: ${{ secrets.AWS_APPLE_CLIENT_ID }}
           APPLE_IOS_CLIENT_ID: ${{ secrets.AWS_APPLE_IOS_CLIENT_ID }}
           API_BASE_URL: ${{ secrets.AWS_API_BASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.AWS_GEMINI_API_KEY }}
+          GEMINI_VISION_MODEL: ${{ secrets.AWS_GEMINI_VISION_MODEL }}
+          SOCIAL_VISION_PROVIDER: ${{ secrets.AWS_SOCIAL_VISION_PROVIDER }}
         run: |
           overrides=( "Stage=prod" )
           if [[ -n "${FRONTEND_URL:-}" ]]; then
@@ -211,6 +217,19 @@ jobs:
           fi
           if [[ -n "${API_BASE_URL:-}" ]]; then
             overrides+=( "ApiBaseUrl=${API_BASE_URL}" )
+          fi
+          if [[ -n "${GEMINI_API_KEY:-}" ]]; then
+            overrides+=( "GeminiApiKey=${GEMINI_API_KEY}" )
+          fi
+          if [[ -n "${GEMINI_VISION_MODEL:-}" ]]; then
+            overrides+=( "GeminiVisionModel=${GEMINI_VISION_MODEL}" )
+          else
+            overrides+=( "GeminiVisionModel=gemini-3.5-flash" )
+          fi
+          if [[ -n "${SOCIAL_VISION_PROVIDER:-}" ]]; then
+            overrides+=( "SocialVisionProvider=${SOCIAL_VISION_PROVIDER}" )
+          else
+            overrides+=( "SocialVisionProvider=auto" )
           fi
           echo "Deploying AWS stack (Stage, ApiFunction, ingest workers…)"
           sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"

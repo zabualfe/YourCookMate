@@ -2,6 +2,8 @@ export interface Ingredient {
   name: string
   quantity: string
   group: string
+  /** Seconds into the source video when this ingredient first appears / is needed. */
+  appears_at_seconds?: number | null
 }
 
 export interface RecipeStep {
@@ -12,6 +14,10 @@ export interface RecipeStep {
   equipment: string[]
   image_url?: string | null
   clip_url?: string | null
+  /** Start of this step in the source video (seconds). */
+  video_start_seconds?: number | null
+  /** End of this step in the source video (seconds). */
+  video_end_seconds?: number | null
 }
 
 export interface ParsedRecipe {

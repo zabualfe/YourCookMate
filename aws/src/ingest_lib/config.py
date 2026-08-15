@@ -34,6 +34,13 @@ class Settings:
     ingest_temp_bucket: str | None = os.environ.get("INGEST_TEMP_BUCKET") or None
     social_vision_max_frames: int = int(os.environ.get("SOCIAL_VISION_MAX_FRAMES", "8"))
     social_step_max_frames: int = int(os.environ.get("SOCIAL_STEP_MAX_FRAMES", "24"))
+    social_vision_provider: str = (
+        os.environ.get("SOCIAL_VISION_PROVIDER") or "auto"
+    ).strip().lower()
+    gemini_api_key: str | None = (os.environ.get("GEMINI_API_KEY") or "").strip() or None
+    gemini_vision_model: str = (
+        os.environ.get("GEMINI_VISION_MODEL") or "gemini-3.5-flash"
+    ).strip()
     feature_ai_enabled: bool = env_bool("FEATURE_AI_ENABLED", True)
 
 

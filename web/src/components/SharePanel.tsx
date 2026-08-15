@@ -24,6 +24,7 @@ export function SharePanel({ recipeId, initial, variant = 'panel', onClose }: Sh
       setIsPublic(data.is_public)
       setShareUrl(data.share_url ?? '')
       queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] })
+      queryClient.invalidateQueries({ queryKey: ['community-recipes'] })
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Failed to update sharing'),
   })
@@ -48,8 +49,8 @@ export function SharePanel({ recipeId, initial, variant = 'panel', onClose }: Sh
     <>
       <p className="text-sm text-stone-600">
         {isPublic
-          ? 'Anyone with the link can view and cook this recipe.'
-          : 'Create a public link to share with friends.'}
+          ? 'Anyone with this link can view and cook the recipe. It is unlisted — not shown in Community.'
+          : 'Create an unlisted link. Only people you send it to can open it.'}
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -63,11 +64,11 @@ export function SharePanel({ recipeId, initial, variant = 'panel', onClose }: Sh
               : 'bg-brand-600 text-white hover:bg-brand-700'
           }`}
         >
-          {mutation.isPending ? 'Updating…' : isPublic ? 'Stop sharing' : 'Share link'}
+          {mutation.isPending ? 'Updating…' : isPublic ? 'Disable link' : 'Create link'}
         </button>
         {isPublic && (
           <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-            Public
+            Link on
           </span>
         )}
       </div>
