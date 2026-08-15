@@ -186,14 +186,21 @@ export function UploadPage() {
           <label className="block">
             <span className="text-sm font-medium text-stone-700">
               Caption from the post{' '}
-              <span className="font-normal text-stone-400">(optional — only if the link doesn&apos;t work)</span>
+              <span className="font-normal text-stone-500">
+                (recommended for Instagram / TikTok when auto-fetch fails)
+              </span>
             </span>
             <textarea
               value={manualCaption}
               onChange={(e) => setManualCaption(e.target.value)}
-              placeholder="Copy and paste the video caption here if we can't read the link automatically…"
+              placeholder="Copy and paste the video caption here — works even when the link can't be fetched automatically…"
               rows={4}
-              className="mt-1 w-full resize-y rounded-xl border border-stone-200 bg-white p-3 text-sm leading-relaxed text-stone-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+              className={[
+                'mt-1 w-full resize-y rounded-xl border bg-white p-3 text-sm leading-relaxed text-stone-800 outline-none focus:ring-2',
+                linkError
+                  ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20'
+                  : 'border-stone-200 focus:border-brand-400 focus:ring-brand-500/20',
+              ].join(' ')}
             />
           </label>
 
@@ -219,11 +226,11 @@ export function UploadPage() {
           {linkError && (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
               <p>{linkError.message || 'Something went wrong. Is the backend running?'}</p>
-              {linkError.message.includes('caption') && (
-                <p className="mt-2 text-red-600/90">
-                  Open the post, copy the caption, paste it in the field above, then try again.
-                </p>
-              )}
+              <p className="mt-2 text-red-600/90">
+                Open the post → copy the caption → paste it in the Caption field above → try again.
+                A working browser link can still fail for Instagram/TikTok because they block server
+                fetches.
+              </p>
             </div>
           )}
 

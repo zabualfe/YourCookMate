@@ -6,8 +6,27 @@ from typing import List, Optional, Tuple
 
 from app.config import settings
 from app.schemas.recipe import Ingredient, ParsedRecipe, RecipeStep
+from app.services.ingredient_locale import normalize_grocery_english
 from app.services.llm import chat_json, resolve_ai_provider
 from app.services.transcript_format import is_suspiciously_even, parse_mmss, snap_to_nearest
+
+LANGUAGE_RULES = """
+LANGUAGE (universal clarity — critical):
+- Prefer clear US grocery / cookbook English that any cook can understand.
+- ALWAYS rewrite regional meat names: beef mince / minced beef → ground beef; pork mince → ground pork;
+  chicken mince → ground chicken; lamb mince → ground lamb; bare "mince" (as the meat) → ground meat.
+  Keep "minced garlic/onion/ginger" as prep wording.
+- Normalize other regional food names, e.g.:
+  aubergine → eggplant; courgette → zucchini; capsicum → bell pepper;
+  coriander leaves → cilantro; spring onion → green onion / scallion;
+  bicarb → baking soda; caster sugar → superfine sugar; plain flour → all-purpose flour;
+  prawns → shrimp; rocket → arugula; cornflour → cornstarch; double cream → heavy cream.
+- Prefer common cookbook / grocery names over slang, dialect, internet shorthand, or local-only nicknames.
+- Keep authentic dish identity (do not rename "pad thai", "biryani", etc.), but describe ingredients and actions plainly.
+- Prefer precise cooking verbs (chop, dice, sear, simmer, whisk, fold) over slang ("slap some", "yeet", "bomb", "finna", "boutta", "lowkey").
+- Standard measures are fine (tsp, tbsp, cup, oz, g, ml, cloves, pieces). Expand vague slang amounts ("a glug", "a lil", "some") only when the source implies a typical amount; otherwise leave quantity "".
+- No emoji, hashtags, or filler hype in ingredient names or step text.
+"""
 
 INGREDIENTS_SYSTEM = """You are a professional cookbook editor extracting a mise en place list.
 
@@ -19,10 +38,12 @@ PRIORITY:
 3. If caption and video conflict on the DISH (wrong-track audio/visual), keep the caption's dish; still use video for timing of matching cooking actions.
 4. Do not invent ingredients that appear in neither caption nor video observations.
 
+""" + LANGUAGE_RULES + """
 Rules:
 - Every distinct edible ingredient exactly once
 - Keep seasoning powders separate when listed/seen separately
 - Quantities from caption or on-screen text when available; "" if unknown — never invent precise amounts
+- Ingredient "name" must be universally understandable (see LANGUAGE)
 - Group: Chicken, Sauce, Pasta, Garnish, Main, etc. when clear; else "Main"
 - appears_at_seconds: from VIDEO OBSERVATIONS [m:ss] when the item is first seen/used
 - No equipment as ingredients
@@ -55,8 +76,10 @@ PRIORITY:
 6. If caption and video conflict on the dish, keep caption dish identity.
 7. Prefer FRAME CLOCK values when present — never invent times between labeled frames.
 
-Write steps as if for a trusted cookbook:
+""" + LANGUAGE_RULES + """
+Write steps as if for a trusted international cookbook:
 - One clear action per step; split compound actions
+- Rewrite slangy / regional creator phrasing into plain imperative English while keeping the same action
 - Seasoning: EACH locked spice/powder for chicken AND for sauce gets applied in a step (bouillon, garlic powder, paprika, onion powder, Italian herbs, pepper, etc.) — do not silently drop any
 - Finish steps that must appear when in the locked list / caption / video: add cooked pasta to the sauce and toss/coat; melt cheese into the sauce; garnish (parsley). Never stop the method before pasta is combined.
 - Imperative voice with technique, heat, timing, doneness when observed
@@ -74,12 +97,14 @@ Return ONLY valid JSON:
 
 REFINE_SYSTEM = """You are a meticulous cookbook proofreader. Compare the DRAFT recipe JSON to the SOURCE TEXT.
 
+""" + LANGUAGE_RULES + """
 Fix only real problems:
 - Missing EARLY prep from the caption (slice chicken, season with each listed spice, heat pan) when the draft jumps into mid-cook
 - Missing FINISH steps: adding cooked pasta to the sauce, melting cheese, garnish — if caption/video include them
 - Hook/outro steps that show finished plated food being eaten while the caption is a from-scratch cook — remove them
 - Missing ingredients listed in the caption OR clearly seen in VIDEO OBSERVATIONS — especially spices/powders (onion powder, garlic powder, Italian herbs, etc.)
 - Wrong/missing quantities when caption or on-screen text states them
+- Steps or ingredient names that use slang, dialect, or regional-only wording — rewrite to universally understood cookbook English (keep meaning)
 - Steps that ignore watched technique/heat/timing from VIDEO OBSERVATIONS
 - Wrong technique vs caption/video (e.g. boiling chicken when the cook sears it in a skillet)
 - Combined actions that should be split based on what was watched
@@ -1081,14 +1106,18 @@ def _finalize_recipe(recipe: ParsedRecipe) -> ParsedRecipe:
     recipe.steps.sort(key=lambda s: s.order)
     for i, step in enumerate(recipe.steps, start=1):
         step.order = i
-        step.instruction = step.instruction.strip()
-        step.ingredients_used = [x.strip() for x in step.ingredients_used if x and str(x).strip()]
+        step.instruction = normalize_grocery_english(step.instruction.strip())
+        step.ingredients_used = [
+            normalize_grocery_english(x.strip())
+            for x in step.ingredients_used
+            if x and str(x).strip()
+        ]
         step.equipment = [x.strip() for x in step.equipment if x and str(x).strip()]
 
     cleaned_ingredients: list[Ingredient] = []
     seen: set[str] = set()
     for ing in recipe.ingredients:
-        name = ing.name.strip()
+        name = normalize_grocery_english(ing.name.strip())
         if not name:
             continue
         key = name.lower()
@@ -1100,7 +1129,7 @@ def _finalize_recipe(recipe: ParsedRecipe) -> ParsedRecipe:
         ing.group = (ing.group or "Main").strip() or "Main"
         cleaned_ingredients.append(ing)
     recipe.ingredients = cleaned_ingredients
-    recipe.title = (recipe.title or "").strip() or "Untitled Recipe"
+    recipe.title = normalize_grocery_english((recipe.title or "").strip()) or "Untitled Recipe"
     return recipe
 
 

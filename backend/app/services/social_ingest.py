@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import tempfile
 from pathlib import Path
@@ -20,18 +21,21 @@ from app.services.video_cache import (
 )
 from app.services.video_vision import analyze_frames_for_recipe
 
+logger = logging.getLogger(__name__)
+
 MIN_USEFUL_TEXT = 80
 _WHISPER_EXTENSIONS = {".m4a", ".mp3", ".mp4", ".mpeg", ".mpga", ".wav", ".webm"}
 # Short-form platforms: silent reels with on-screen text are common — always analyze video.
 SHORT_FORM_PLATFORMS = frozenset({"instagram", "tiktok", "facebook", "pinterest"})
 
 _LOGIN_REQUIRED_DETAIL = (
-    "Could not access this post automatically. "
-    "Paste the caption in the optional Caption field, then click Import again. "
-    "For automatic fetch on the server, set YTDLP_COOKIES or YTDLP_COOKIES_FILE."
+    "Could not access this post automatically (login/cookies required). "
+    "Paste the caption in the Caption field above, then try again. "
+    "To refresh automatic fetch locally, run: npm run export:cookies"
 )
 
 _ytdlp_cookies_cache_path: Optional[str] = None
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 def _short_vision_error(exc: BaseException) -> str:
@@ -55,7 +59,12 @@ def _short_vision_error(exc: BaseException) -> str:
 def _ytdlp_cookie_file() -> Optional[str]:
     global _ytdlp_cookies_cache_path
     if settings.ytdlp_cookies_file:
-        return settings.ytdlp_cookies_file
+        raw = Path(settings.ytdlp_cookies_file).expanduser()
+        path = raw if raw.is_absolute() else (_BACKEND_DIR / raw).resolve()
+        if path.is_file():
+            return str(path)
+        logger.warning("YTDLP_COOKIES_FILE not found: %s", path)
+        return None
     if not settings.ytdlp_cookies or not settings.ytdlp_cookies.strip():
         return None
     if _ytdlp_cookies_cache_path is None:
@@ -63,6 +72,99 @@ def _ytdlp_cookie_file() -> Optional[str]:
         path.write_text(settings.ytdlp_cookies.strip() + "\n", encoding="utf-8")
         _ytdlp_cookies_cache_path = str(path)
     return _ytdlp_cookies_cache_path
+
+
+def _ytdlp_impersonate():
+    """Browser TLS impersonation — required for TikTok and helps Instagram."""
+    try:
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+    except Exception:
+        return None
+    try:
+        probe = __import__("yt_dlp").YoutubeDL({"quiet": True})
+        available = probe._get_available_impersonate_targets()
+    except Exception:
+        available = []
+    preferred = (
+        ImpersonateTarget("chrome", None, "macos", None),
+        ImpersonateTarget("chrome", None, "windows", None),
+        ImpersonateTarget("chrome", None, None, None),
+        ImpersonateTarget("safari", None, "macos", None),
+    )
+    for want in preferred:
+        for target, _rh in available:
+            if want in target or target in want:
+                return target
+    if available:
+        return available[0][0]
+    return None
+
+
+def _friendly_fetch_error(exc: BaseException, url: str) -> str:
+    message = str(exc)
+    lower = message.lower()
+    platform = classify_video_url(url)
+
+    if "login" in lower or "cookies" in lower or "empty media response" in lower:
+        return _LOGIN_REQUIRED_DETAIL
+    if "blocked" in lower or "ip address" in lower:
+        return (
+            f"{platform.title()} blocked automatic fetch from this server. "
+            "Paste the video caption in the Caption field above, then try again."
+        )
+    if "400" in lower or "bad request" in lower:
+        return (
+            f"Could not fetch this {platform} link automatically "
+            "(the platform blocked the request). "
+            "Paste the caption in the Caption field above, then try again."
+        )
+    if "private" in lower or "unavailable" in lower or "not available" in lower:
+        return (
+            "This post looks private or unavailable to automatic fetch. "
+            "Paste the caption in the Caption field above, then try again."
+        )
+    return (
+        "Could not fetch this link automatically. "
+        "Paste the caption in the Caption field above, then try again."
+    )
+
+
+def _ytdlp_options(**extra: object) -> dict:
+    opts: dict = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "noplaylist": True,
+        "socket_timeout": 45,
+        **extra,
+    }
+    cookie_file = _ytdlp_cookie_file()
+    if cookie_file:
+        opts["cookiefile"] = cookie_file
+    impersonate = _ytdlp_impersonate()
+    if impersonate is not None and "impersonate" not in opts:
+        opts["impersonate"] = impersonate
+    return opts
+
+
+def _extract_with_ytdlp(url: str) -> dict:
+    try:
+        import yt_dlp
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Video import is not available (yt-dlp missing on server).",
+        ) from exc
+
+    try:
+        with yt_dlp.YoutubeDL(_ytdlp_options()) as ydl:
+            return ydl.extract_info(url, download=False)
+    except Exception as exc:
+        logger.warning("yt-dlp extract failed for %s: %s", url, exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_friendly_fetch_error(exc, url),
+        ) from exc
 
 
 def _normalize_url(url: str) -> str:
@@ -145,67 +247,6 @@ def _confidence_for_text(text: str, had_transcript: bool, had_vision: bool) -> f
     if had_vision:
         score += 0.15
     return min(score, 1.0)
-
-
-def _ytdlp_options(**extra: object) -> dict:
-    opts: dict = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "noplaylist": True,
-        "socket_timeout": 45,
-        **extra,
-    }
-    cookie_file = _ytdlp_cookie_file()
-    if cookie_file:
-        opts["cookiefile"] = cookie_file
-    return opts
-
-
-def _extract_with_ytdlp(url: str) -> dict:
-    try:
-        import yt_dlp
-    except ImportError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Video import is not available (yt-dlp missing on server).",
-        ) from exc
-
-    try:
-        with yt_dlp.YoutubeDL(_ytdlp_options()) as ydl:
-            return ydl.extract_info(url, download=False)
-    except yt_dlp.utils.DownloadError as exc:
-        message = str(exc)
-        if "login" in message.lower() or "cookies" in message.lower():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=_LOGIN_REQUIRED_DETAIL,
-            ) from exc
-        if "blocked" in message.lower() or "ip address" in message.lower():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="This platform blocked automatic fetch. Paste the video caption below and try again.",
-            ) from exc
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Could not fetch this link. Check the URL or paste the caption manually.",
-        ) from exc
-    except Exception as exc:
-        message = str(exc).lower()
-        if "login" in message or "cookies" in message:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=_LOGIN_REQUIRED_DETAIL,
-            ) from exc
-        if "blocked" in message or "ip address" in message:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="This platform blocked automatic fetch. Paste the video caption below and try again.",
-            ) from exc
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Could not fetch this link. Paste the caption manually if the video is private or region-locked.",
-        ) from exc
 
 
 def _parse_vtt(content: str) -> str:
@@ -600,21 +641,9 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
     source_url = _normalize_url(url)
     source_type = classify_video_url(source_url)
     notes: list[str] = []
-
-    if manual_caption and manual_caption.strip():
-        raw_text = manual_caption.strip()
+    provided_caption = (manual_caption or "").strip() or None
+    if provided_caption:
         notes.append("Used caption you provided.")
-        return {
-            "raw_text": raw_text,
-            "source_type": source_type,
-            "source_url": source_url,
-            "title": None,
-            "author": None,
-            "thumbnail_url": None,
-            "video_duration": None,
-            "extraction_notes": notes,
-            "confidence": _confidence_for_text(raw_text, had_transcript=False, had_vision=False),
-        }
 
     info: Optional[dict] = None
     metadata_error: Optional[HTTPException] = None
@@ -640,6 +669,11 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
             duration = float(duration)
         else:
             duration = None
+
+    # Prefer the user's pasted caption when automatic description is missing/weak.
+    if provided_caption:
+        if not description or len(description) < len(provided_caption):
+            description = provided_caption
 
     subtitle_text = _fetch_subtitle_text(info) if info else None
     if subtitle_text:
@@ -669,6 +703,8 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
         )
 
     raw_text = _merge_text_parts(title, description, subtitle_text, transcript, visual_text)
+    if not raw_text and provided_caption:
+        raw_text = provided_caption
     if not raw_text and metadata_error is not None:
         raise metadata_error
 

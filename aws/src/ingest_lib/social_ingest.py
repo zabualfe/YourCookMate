@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -19,12 +20,13 @@ from ingest_lib.video_cache import (
 )
 from ingest_lib.video_frames import extract_audio_from_video
 
+logger = logging.getLogger(__name__)
+
 MIN_USEFUL_TEXT = 80
 SHORT_FORM_PLATFORMS = frozenset({"instagram", "tiktok", "facebook", "pinterest"})
 _LOGIN_REQUIRED_DETAIL = (
-    "Could not access this post automatically. "
-    "Paste the caption in the optional Caption field, then click Import again. "
-    "For automatic fetch on the server, set YTDLP_COOKIES."
+    "Could not access this post automatically (login/cookies required). "
+    "Paste the caption in the Caption field above, then try again."
 )
 
 _ytdlp_cookies_cache_path: Optional[str] = None
@@ -118,6 +120,59 @@ def _confidence_for_text(text: str, had_transcript: bool, had_vision: bool) -> f
     return min(score, 1.0)
 
 
+def _ytdlp_impersonate():
+    try:
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+    except Exception:
+        return None
+    try:
+        probe = __import__("yt_dlp").YoutubeDL({"quiet": True})
+        available = probe._get_available_impersonate_targets()
+    except Exception:
+        available = []
+    preferred = (
+        ImpersonateTarget("chrome", None, "macos", None),
+        ImpersonateTarget("chrome", None, "windows", None),
+        ImpersonateTarget("chrome", None, None, None),
+        ImpersonateTarget("safari", None, "macos", None),
+    )
+    for want in preferred:
+        for target, _rh in available:
+            if want in target or target in want:
+                return target
+    if available:
+        return available[0][0]
+    return None
+
+
+def _friendly_fetch_error(exc: BaseException, url: str) -> str:
+    message = str(exc)
+    lower = message.lower()
+    platform = classify_video_url(url)
+    if "login" in lower or "cookies" in lower or "empty media response" in lower:
+        return _LOGIN_REQUIRED_DETAIL
+    if "blocked" in lower or "ip address" in lower:
+        return (
+            f"{platform.title()} blocked automatic fetch from this server. "
+            "Paste the video caption in the Caption field above, then try again."
+        )
+    if "400" in lower or "bad request" in lower:
+        return (
+            f"Could not fetch this {platform} link automatically "
+            "(the platform blocked the request). "
+            "Paste the caption in the Caption field above, then try again."
+        )
+    if "private" in lower or "unavailable" in lower or "not available" in lower:
+        return (
+            "This post looks private or unavailable to automatic fetch. "
+            "Paste the caption in the Caption field above, then try again."
+        )
+    return (
+        "Could not fetch this link automatically. "
+        "Paste the caption in the Caption field above, then try again."
+    )
+
+
 def _ytdlp_options(**extra: object) -> dict:
     opts: dict = {
         "quiet": True,
@@ -130,6 +185,9 @@ def _ytdlp_options(**extra: object) -> dict:
     cookie_file = _ytdlp_cookie_file()
     if cookie_file:
         opts["cookiefile"] = cookie_file
+    impersonate = _ytdlp_impersonate()
+    if impersonate is not None and "impersonate" not in opts:
+        opts["impersonate"] = impersonate
     return opts
 
 
@@ -145,28 +203,11 @@ def _extract_with_ytdlp(url: str) -> dict:
     try:
         with yt_dlp.YoutubeDL(_ytdlp_options()) as ydl:
             return ydl.extract_info(url, download=False)
-    except yt_dlp.utils.DownloadError as exc:
-        message = str(exc).lower()
-        if "login" in message or "cookies" in message:
-            raise IngestError(_LOGIN_REQUIRED_DETAIL) from exc
-        if "blocked" in message or "ip address" in message:
-            raise IngestError(
-                "This platform blocked automatic fetch. Paste the video caption below and try again."
-            ) from exc
-        raise IngestError("Could not fetch this link. Check the URL or paste the caption manually.") from exc
     except IngestError:
         raise
     except Exception as exc:
-        message = str(exc).lower()
-        if "login" in message or "cookies" in message:
-            raise IngestError(_LOGIN_REQUIRED_DETAIL) from exc
-        if "blocked" in message or "ip address" in message:
-            raise IngestError(
-                "This platform blocked automatic fetch. Paste the video caption below and try again."
-            ) from exc
-        raise IngestError(
-            "Could not fetch this link. Paste the caption manually if the video is private or region-locked."
-        ) from exc
+        logger.warning("yt-dlp extract failed for %s: %s", url, exc)
+        raise IngestError(_friendly_fetch_error(exc, url)) from exc
 
 
 def _parse_vtt(content: str) -> str:
@@ -267,9 +308,15 @@ def _should_run_audio(
 ) -> bool:
     if transcript is not None:
         return False
+    # Short-form captions often omit technique/timing — still try speech when useful.
+    if source_type in SHORT_FORM_PLATFORMS:
+        return _needs_enrichment(merged, None)
     if subtitle and len(subtitle.strip()) >= 20:
         return False
     return _needs_enrichment(merged, None)
+
+
+_VIDEO_PLATFORMS = frozenset({"youtube", "facebook", "vimeo", "pinterest"}) | SHORT_FORM_PLATFORMS
 
 
 def _should_run_visual(
@@ -278,6 +325,10 @@ def _should_run_visual(
     transcript: Optional[str],
     subtitle: Optional[str] = None,
 ) -> bool:
+    # Always watch short-form / video platforms with Gemini (or frame fallback),
+    # even when the caption already looks complete — caption-only skips miss visual cues.
+    if source_type in _VIDEO_PLATFORMS:
+        return True
     effective_transcript = transcript
     if not effective_transcript and subtitle and len(subtitle.strip()) >= 20:
         effective_transcript = subtitle
@@ -414,21 +465,9 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
     source_url = _normalize_url(url)
     source_type = classify_video_url(source_url)
     notes: list[str] = []
-
-    if manual_caption and manual_caption.strip():
-        raw_text = manual_caption.strip()
+    provided_caption = (manual_caption or "").strip() or None
+    if provided_caption:
         notes.append("Used caption you provided.")
-        return {
-            "raw_text": raw_text,
-            "source_type": source_type,
-            "source_url": source_url,
-            "title": None,
-            "author": None,
-            "thumbnail_url": None,
-            "video_duration": None,
-            "extraction_notes": notes,
-            "confidence": _confidence_for_text(raw_text, had_transcript=False, had_vision=False),
-        }
 
     info: Optional[dict] = None
     metadata_error: Optional[IngestError] = None
@@ -452,6 +491,10 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
         raw_duration = info.get("duration")
         duration = float(raw_duration) if isinstance(raw_duration, (int, float)) else None
 
+    if provided_caption:
+        if not description or len(description) < len(provided_caption):
+            description = provided_caption
+
     subtitle_text = _fetch_subtitle_text(info) if info else None
     if subtitle_text:
         notes.append("Added on-screen captions from the video.")
@@ -467,6 +510,8 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
     elif need_video:
         if get_cached_video(source_url):
             notes.append("Using cached video from this import session.")
+        elif need_visual and not need_audio:
+            notes.append("Caption looks usable — still downloading video for Gemini visual analysis…")
         else:
             notes.append("Downloading video for transcription and visual analysis…")
         ensure_video_cached(
@@ -518,6 +563,8 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
         visual_text = _run_visual_step(source_url, notes, duration, caption_for_vision)
 
     raw_text = _merge_text_parts(title, description, subtitle_text, transcript, visual_text)
+    if not raw_text and provided_caption:
+        raw_text = provided_caption
     if not raw_text and metadata_error is not None:
         raise metadata_error
 

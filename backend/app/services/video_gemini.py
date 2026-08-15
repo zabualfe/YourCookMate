@@ -26,6 +26,7 @@ Rules:
 4. Cover early prep through finish. Do not start mid-recipe.
 5. One clear action per timed-method line. Split separate seasoning powders when you can see them applied separately.
 6. Do not invent foods or moves that are neither visible nor in the caption.
+7. Use clear, universal cookbook English for ingredient names and timed-method lines — no slang, dialect, or local-only nicknames. Prefer widely recognized grocery names (e.g. eggplant not aubergine; ground meat not mince; green onion/scallion for spring onion).
 
 Return plain text only — no JSON. Use these sections:
 

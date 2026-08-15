@@ -66,7 +66,9 @@ export async function parseRecipe(
         }
 
   const { getAwsIngestBase, parseRecipeViaAws } = await import('./ingest')
-  if (getAwsIngestBase()) {
+  // Locally prefer the FastAPI parser so locale/language fixes apply without waiting on AWS deploy.
+  // Production (non-DEV) still uses AWS when configured.
+  if (getAwsIngestBase() && !import.meta.env.DEV) {
     return parseRecipeViaAws(body)
   }
 

@@ -8,6 +8,7 @@ from typing import Any, Optional
 import boto3
 
 from ingest_lib.config import settings
+from parse_lib.ingredient_locale import normalize_grocery_english
 
 SYSTEM_PROMPT = """You are a precise recipe parser for Your Cook Mate. Convert raw recipe text into structured JSON for a step-by-step cooking app.
 
@@ -21,8 +22,25 @@ PRECISION RULES (critical):
 5. ingredients_used must use EXACT ingredient names from the ingredients list (same spelling).
 6. appears_at_seconds for an ingredient = the first moment it is mentioned, shown, or used (usually that step's video_start_seconds).
 
+LANGUAGE (universal clarity — critical):
+- Prefer clear US grocery / cookbook English that any cook can understand.
+- ALWAYS rewrite regional meat names: beef mince / minced beef → ground beef; pork mince → ground pork;
+  chicken mince → ground chicken; lamb mince → ground lamb; bare "mince" (as the meat) → ground meat.
+  Keep "minced garlic/onion/ginger" as prep wording.
+- Normalize other regional food names, e.g.:
+  aubergine → eggplant; courgette → zucchini; capsicum → bell pepper;
+  coriander leaves → cilantro; spring onion → green onion / scallion;
+  bicarb → baking soda; caster sugar → superfine sugar; plain flour → all-purpose flour;
+  prawns → shrimp; rocket → arugula; cornflour → cornstarch; double cream → heavy cream.
+- Prefer common cookbook / grocery names over slang, dialect, internet shorthand, or local-only nicknames.
+- Keep authentic dish identity (do not rename "pad thai", "biryani", etc.), but describe ingredients and actions plainly.
+- Prefer precise cooking verbs (chop, dice, sear, simmer, whisk, fold) over slang ("slap some", "yeet", "bomb", "finna", "boutta", "lowkey").
+- Standard measures are fine (tsp, tbsp, cup, oz, g, ml, cloves, pieces). Expand vague slang amounts ("a glug", "a lil") only when the source implies a typical amount; otherwise leave quantity "".
+- No emoji, hashtags, or filler hype in ingredient names or step text.
+
 Rules for steps:
 - Short imperative sentences ("Dice the onion into ½-inch pieces")
+- Rewrite slangy / regional creator phrasing into plain imperative English while keeping the same action
 - Include implicit steps only when clearly needed (preheat, rest, etc.)
 - Cap each step at ~2 sentences
 - duration_minutes = cooking/wait time mentioned in the step (minutes), NOT video time
@@ -332,7 +350,7 @@ def _optional_float(value: Any) -> Optional[float]:
 def _recipe_from_dict(data: dict[str, Any]) -> ParsedRecipe:
     ingredients = [
         Ingredient(
-            name=str(item.get("name", "")).strip(),
+            name=normalize_grocery_english(str(item.get("name", "")).strip()),
             quantity=str(item.get("quantity", "")),
             group=str(item.get("group", "Main") or "Main"),
             appears_at_seconds=_optional_float(item.get("appears_at_seconds")),
@@ -340,12 +358,27 @@ def _recipe_from_dict(data: dict[str, Any]) -> ParsedRecipe:
         for item in (data.get("ingredients") or [])
         if str(item.get("name", "")).strip()
     ]
+    # Dedupe after locale normalization
+    deduped: list[Ingredient] = []
+    seen: set[str] = set()
+    for ing in ingredients:
+        key = ing.name.lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(ing)
+    ingredients = deduped
+
     steps = [
         RecipeStep(
             order=_optional_int(step.get("order")) or idx,
-            instruction=str(step.get("instruction", "")).strip(),
+            instruction=normalize_grocery_english(str(step.get("instruction", "")).strip()),
             duration_minutes=_optional_int(step.get("duration_minutes")),
-            ingredients_used=[str(x) for x in (step.get("ingredients_used") or []) if x],
+            ingredients_used=[
+                normalize_grocery_english(str(x))
+                for x in (step.get("ingredients_used") or [])
+                if x
+            ],
             equipment=[str(x) for x in (step.get("equipment") or []) if x],
             video_start_seconds=_optional_float(step.get("video_start_seconds")),
             video_end_seconds=_optional_float(step.get("video_end_seconds")),
@@ -358,7 +391,8 @@ def _recipe_from_dict(data: dict[str, Any]) -> ParsedRecipe:
         step.order = i
 
     return ParsedRecipe(
-        title=str(data.get("title", "Untitled Recipe")).strip() or "Untitled Recipe",
+        title=normalize_grocery_english(str(data.get("title", "Untitled Recipe")).strip())
+        or "Untitled Recipe",
         servings=_optional_int(data.get("servings")),
         prep_time_minutes=_optional_int(data.get("prep_time_minutes")),
         cook_time_minutes=_optional_int(data.get("cook_time_minutes")),

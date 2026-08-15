@@ -47,6 +47,9 @@ export function ReviewPage() {
       n.includes('Gemini returned no recipe'),
   )
   const usedFrames = extractionNotes.some((n) => n.includes('frame stills'))
+  const captionOnlySkip = extractionNotes.some((n) =>
+    n.includes('skipped video download and AI enrichment'),
+  )
   const visionHeadline = geminiSucceeded
     ? 'Video analyzed with Gemini'
     : geminiFailed && usedFrames
@@ -55,7 +58,10 @@ export function ReviewPage() {
         ? 'Gemini failed — no visual brief'
         : usedFrames
           ? 'Video analyzed with frame stills'
-          : extractionNotes.find((n) => n.startsWith('Vision:')) ?? null
+          : captionOnlySkip
+            ? 'Caption only — video AI enrichment was skipped'
+            : extractionNotes.find((n) => n.startsWith('Vision:')) ??
+              (extractionNotes.length > 0 ? extractionNotes[0] : null)
 
   const buildRecipe = () => normalizeRecipe(recipeDraft)
 

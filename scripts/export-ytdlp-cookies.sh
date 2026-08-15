@@ -27,7 +27,7 @@ python3 <<'PY'
 from pathlib import Path
 
 src = Path("cookies.txt")
-domains = ("instagram.com", "facebook.com", "fb.com", "fb.watch")
+domains = ("instagram.com", "facebook.com", "fb.com", "fb.watch", "tiktok.com")
 entries = []
 for line in src.read_text(encoding="utf-8", errors="replace").splitlines():
     if not line.strip() or line.startswith("#"):

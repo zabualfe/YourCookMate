@@ -224,16 +224,22 @@ export default function NewRecipeScreen() {
         <View>
           <Text style={labelStyle()}>
             Caption from the post{' '}
-            <Text style={styles.optionalHint}>(optional — only if the link doesn&apos;t work)</Text>
+            <Text style={styles.optionalHint}>
+              (recommended for Instagram / TikTok when auto-fetch fails)
+            </Text>
           </Text>
           <TextInput
             value={manualCaption}
             onChangeText={setManualCaption}
-            placeholder="Copy and paste the video caption here if we can't read the link automatically…"
+            placeholder="Copy and paste the video caption here — works even when the link can't be fetched automatically…"
             placeholderTextColor={colors.stone400}
             multiline
             textAlignVertical="top"
-            style={[commonStyles.input, styles.captionArea]}
+            style={[
+              commonStyles.input,
+              styles.captionArea,
+              linkError ? { borderColor: colors.accent500 } : null,
+            ]}
           />
         </View>
 
@@ -260,11 +266,10 @@ export default function NewRecipeScreen() {
             <Text style={commonStyles.errorBannerText}>
               {linkError.message || 'Something went wrong. Is the backend running?'}
             </Text>
-            {linkError.message.includes('caption') && (
-              <Text style={[commonStyles.errorBannerText, { marginTop: spacing.sm, opacity: 0.9 }]}>
-                Open the post, copy the caption, paste it in the field above, then try again.
-              </Text>
-            )}
+            <Text style={[commonStyles.errorBannerText, { marginTop: spacing.sm, opacity: 0.9 }]}>
+              Open the post → copy the caption → paste it above → try again. Instagram/TikTok often
+              block automatic link fetch even when the URL works in your browser.
+            </Text>
           </View>
         )}
 

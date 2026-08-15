@@ -63,6 +63,8 @@ Then cross-check the caption:
 Format:
 [m:ss] quantity name
 
+Use clear, universal grocery names (no slang). Prefer widely recognized forms (eggplant, zucchini, ground meat, bell pepper, cilantro / fresh coriander, green onion / scallion).
+
 Never invent items that are neither visible nor in the caption. Never write cooking steps."""
 
 _ACTION_PROMPT = """You are the Action Timeline Agent. WATCH the cooking video and narrate what the cook does.
@@ -88,7 +90,7 @@ Caption cross-check:
 - If the video shows an action the caption skipped, still include it with its [m:ss]
 
 Format:
-[m:ss] imperative instruction"""
+[m:ss] imperative instruction in clear universal cookbook English (no slang or dialect)"""
 
 _RECONCILE_SYSTEM = """You are the Lead Cookbook Editor. Merge reports from agents who WATCHED the video.
 
@@ -103,6 +105,7 @@ FUSION RULES:
 6. If caption and video conflict on the DISH, trust the caption for dish identity.
 7. Timed method: one action per line. For watched actions, copy the agent's [m:ss] EXACTLY from the action/segment reports — never invent or evenly redistribute times. Prefer the Action Timeline agent's times when present.
 8. You may ONLY use timestamps that appear in the FRAME CLOCK list (or null for caption-only prep).
+9. Ingredient names and timed_method instructions must use clear, universal cookbook English — rewrite slang/regional wording while keeping the same meaning and dish identity.
 
 Return ONLY JSON:
 {
