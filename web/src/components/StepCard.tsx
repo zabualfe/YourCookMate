@@ -4,10 +4,9 @@ import { TimerChip } from './TimerChip'
 interface StepCardProps {
   step: RecipeStep
   stepNumber: number
-  totalSteps: number
 }
 
-export function StepCard({ step, stepNumber, totalSteps }: StepCardProps) {
+export function StepCard({ step, stepNumber }: StepCardProps) {
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-6 py-8 text-center sm:px-10">
       {step.clip_url ? (

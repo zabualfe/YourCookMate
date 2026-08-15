@@ -113,7 +113,6 @@ export function CookModeShell({ recipe, recipeId }: CookModeShellProps) {
                 <StepCard
                   step={currentStep}
                   stepNumber={currentIndex + 1}
-                  totalSteps={total}
                 />
               </motion.div>
             )}
