@@ -13,7 +13,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ingestSocialLink } from '@/api/ingest'
 import { checkUpload, getBillingUsage, lookupSocialLink, parseRecipe } from '@/api/client'
-import { isBillingError } from '@/api/errors'
+import { isBillingError, isSocialFetchError } from '@/api/errors'
 import { saveReviewDraft, consumeAddFormReset } from '@/lib/reviewDraft'
 import type { IngestLinkResponse } from '@/types/ingest'
 import { videoPlatformLabel } from '@/types/ingest'
@@ -74,17 +74,21 @@ export default function NewRecipeScreen() {
     mutationFn: async (opts: { force?: boolean } = {}): Promise<CreateResult> => {
       const force = Boolean(opts?.force)
       if (!force) {
-        const looked = await lookupSocialLink(linkUrl.trim())
-        if (looked.found && looked.existing_recipe_id) {
-          return {
-            status: 'cached',
-            kind: 'library',
-            ingested: looked,
-            rawText: looked.raw_text.trim(),
+        try {
+          const looked = await lookupSocialLink(linkUrl.trim())
+          if (looked.found && looked.existing_recipe_id) {
+            return {
+              status: 'cached',
+              kind: 'library',
+              ingested: looked,
+              rawText: looked.raw_text.trim(),
+            }
           }
-        }
-        if (looked.found && looked.from_cache && looked.recipe && looked.recipe.steps.length > 0) {
-          return { status: 'cached', kind: 'generated', ingested: looked, rawText: looked.raw_text.trim() }
+          if (looked.found && looked.from_cache && looked.recipe && looked.recipe.steps.length > 0) {
+            return { status: 'cached', kind: 'generated', ingested: looked, rawText: looked.raw_text.trim() }
+          }
+        } catch {
+          // Lookup is optional — production used to 404 this route; still try ingest.
         }
       }
       await checkUpload()
@@ -409,10 +413,12 @@ export default function NewRecipeScreen() {
             <Text style={commonStyles.errorBannerText}>
               {linkError.message || 'Something went wrong. Is the backend running?'}
             </Text>
-            <Text style={[commonStyles.errorBannerText, { marginTop: spacing.sm, opacity: 0.9 }]}>
-              Open the post → copy the caption → paste it above → try again. Instagram/TikTok often
-              block automatic link fetch even when the URL works in your browser.
-            </Text>
+            {isSocialFetchError(linkError) ? (
+              <Text style={[commonStyles.errorBannerText, { marginTop: spacing.sm, opacity: 0.9 }]}>
+                Open the post → copy the caption → paste it above → try again. Instagram/TikTok often
+                block automatic link fetch even when the URL works in your browser.
+              </Text>
+            ) : null}
           </View>
         )}
 

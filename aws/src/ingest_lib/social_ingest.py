@@ -13,6 +13,7 @@ import httpx
 from ingest_lib.bedrock_vision import analyze_frames_for_recipe, transcribe_audio_file
 from ingest_lib.config import settings
 from ingest_lib.errors import IngestError
+from ingest_lib.link_metadata import resolve_public_url, webpage_fallback_info
 from ingest_lib.video_cache import (
     ensure_video_cached,
     get_cached_frames,
@@ -173,7 +174,12 @@ def _friendly_fetch_error(exc: BaseException, url: str) -> str:
     )
 
 
-def _ytdlp_options(**extra: object) -> dict:
+def _ytdlp_options(
+    *,
+    use_cookies: bool = True,
+    use_impersonate: bool = True,
+    **extra: object,
+) -> dict:
     opts: dict = {
         "quiet": True,
         "no_warnings": True,
@@ -182,12 +188,14 @@ def _ytdlp_options(**extra: object) -> dict:
         "socket_timeout": 45,
         **extra,
     }
-    cookie_file = _ytdlp_cookie_file()
-    if cookie_file:
-        opts["cookiefile"] = cookie_file
-    impersonate = _ytdlp_impersonate()
-    if impersonate is not None and "impersonate" not in opts:
-        opts["impersonate"] = impersonate
+    if use_cookies:
+        cookie_file = _ytdlp_cookie_file()
+        if cookie_file:
+            opts["cookiefile"] = cookie_file
+    if use_impersonate:
+        impersonate = _ytdlp_impersonate()
+        if impersonate is not None and "impersonate" not in opts:
+            opts["impersonate"] = impersonate
     return opts
 
 
@@ -200,14 +208,32 @@ def _extract_with_ytdlp(url: str) -> dict:
             "Redeploy the AWS stack so the ingest worker includes requirements-worker.txt."
         ) from exc
 
-    try:
-        with yt_dlp.YoutubeDL(_ytdlp_options()) as ydl:
-            return ydl.extract_info(url, download=False)
-    except IngestError:
-        raise
-    except Exception as exc:
-        logger.warning("yt-dlp extract failed for %s: %s", url, exc)
-        raise IngestError(_friendly_fetch_error(exc, url)) from exc
+    source_url = resolve_public_url(url)
+    last_exc: Optional[BaseException] = None
+    cookie_file = _ytdlp_cookie_file()
+    attempts: list[dict[str, bool]] = []
+    if cookie_file:
+        attempts.append({"use_cookies": True, "use_impersonate": True})
+    attempts.append({"use_cookies": False, "use_impersonate": True})
+    if cookie_file:
+        attempts.append({"use_cookies": True, "use_impersonate": False})
+
+    for attempt in attempts:
+        try:
+            with yt_dlp.YoutubeDL(_ytdlp_options(**attempt)) as ydl:
+                return ydl.extract_info(source_url, download=False)
+        except IngestError:
+            raise
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("yt-dlp extract failed (%s) for %s: %s", attempt, source_url, exc)
+
+    fallback = webpage_fallback_info(source_url, classify_video_url(source_url))
+    if fallback:
+        logger.info("Using webpage/oembed metadata for %s", source_url)
+        return fallback
+
+    raise IngestError(_friendly_fetch_error(last_exc or RuntimeError("extract failed"), source_url)) from last_exc
 
 
 def _parse_vtt(content: str) -> str:

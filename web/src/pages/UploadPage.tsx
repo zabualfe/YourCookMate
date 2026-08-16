@@ -6,7 +6,7 @@ import { useFeatures } from '../context/FeaturesContext'
 import { useAuth } from '../context/AuthContext'
 import { ingestSocialLink } from '../api/ingest'
 import { checkUpload, lookupSocialLink, parseRecipe, getBillingUsage } from '../api/client'
-import { isBillingError } from '../api/errors'
+import { isBillingError, isSocialFetchError } from '../api/errors'
 import { VideoLinkPreview } from '../components/VideoLinkPreview'
 import { RecipeCreateProgress } from '../components/RecipeCreateProgress'
 import { ExistingSourcePrompt } from '../components/ExistingSourcePrompt'
@@ -81,17 +81,21 @@ export function UploadPage() {
     mutationFn: async (opts: { force?: boolean } = {}): Promise<CreateResult> => {
       const force = Boolean(opts?.force)
       if (!force) {
-        const looked = await lookupSocialLink(linkUrl.trim())
-        if (looked.found && looked.existing_recipe_id) {
-          return {
-            status: 'cached',
-            kind: 'library',
-            ingested: looked,
-            rawText: looked.raw_text.trim(),
+        try {
+          const looked = await lookupSocialLink(linkUrl.trim())
+          if (looked.found && looked.existing_recipe_id) {
+            return {
+              status: 'cached',
+              kind: 'library',
+              ingested: looked,
+              rawText: looked.raw_text.trim(),
+            }
           }
-        }
-        if (looked.found && looked.from_cache && looked.recipe && looked.recipe.steps.length > 0) {
-          return { status: 'cached', kind: 'generated', ingested: looked, rawText: looked.raw_text.trim() }
+          if (looked.found && looked.from_cache && looked.recipe && looked.recipe.steps.length > 0) {
+            return { status: 'cached', kind: 'generated', ingested: looked, rawText: looked.raw_text.trim() }
+          }
+        } catch {
+          // Lookup is optional — production used to 404 this route; still try ingest.
         }
       }
       await checkUpload()
@@ -374,11 +378,13 @@ export function UploadPage() {
           {linkError && !isBillingError(linkError) && (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
               <p>{linkError.message || 'Something went wrong. Is the backend running?'}</p>
-              <p className="mt-2 text-red-600/90">
-                Open the post → copy the caption → paste it in the Caption field above → try again.
-                A working browser link can still fail for Instagram/TikTok because they block server
-                fetches.
-              </p>
+              {isSocialFetchError(linkError) && (
+                <p className="mt-2 text-red-600/90">
+                  Open the post → copy the caption → paste it in the Caption field above → try again.
+                  A working browser link can still fail for Instagram/TikTok because they block server
+                  fetches.
+                </p>
+              )}
             </div>
           )}
 

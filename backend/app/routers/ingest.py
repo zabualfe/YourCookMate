@@ -16,14 +16,14 @@ from app.schemas.ingest import (
 )
 from app.services.billing import assert_can_upload, assert_video_duration_allowed
 from app.services.feature_flags import require_social_ingest_enabled
-from app.services.social_ingest import classify_video_url, ingest_social_link, preview_social_link
-from app.services.source_key import expand_source_url
+from app.services.source_key import classify_host, expand_source_url
 from app.services.source_lookup import (
     cached_to_ingest_response,
     find_user_recipe_id,
     lookup_cached_source,
 )
 
+lookup_router = APIRouter(prefix="/ingest", tags=["ingest"])
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
 
@@ -37,7 +37,7 @@ def _cached_ingest_payload(
     if force:
         return None
     source_url = expand_source_url(url)
-    source_type = classify_video_url(source_url)
+    source_type = classify_host(source_url)
     existing_id = find_user_recipe_id(
         db, user.id, url, source_type, expanded=source_url,
     )
@@ -74,7 +74,7 @@ def _cached_ingest_payload(
     }
 
 
-@router.post("/lookup", response_model=IngestLinkResponse)
+@lookup_router.post("/lookup", response_model=IngestLinkResponse)
 def lookup_link(
     body: IngestLookupRequest,
     db: Session = Depends(get_db),
@@ -86,7 +86,7 @@ def lookup_link(
         source_url = expand_source_url(body.url)
         return IngestLinkResponse(
             raw_text="",
-            source_type=classify_video_url(source_url),
+            source_type=classify_host(source_url),
             source_url=source_url,
             found=False,
             from_cache=False,
@@ -105,6 +105,8 @@ def ingest_link(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> IngestLinkResponse:
+    from app.services.social_ingest import ingest_social_link
+
     require_social_ingest_enabled()
 
     payload = _cached_ingest_payload(db, user, body.url, force=body.force)
@@ -127,6 +129,8 @@ def ingest_link(
 
 @router.post("/preview", response_model=LinkPreviewResponse)
 def preview_link(body: LinkPreviewRequest) -> LinkPreviewResponse:
+    from app.services.social_ingest import preview_social_link
+
     require_social_ingest_enabled()
     result = preview_social_link(body.url)
     return LinkPreviewResponse(**result)

@@ -24,6 +24,18 @@ export function isBillingError(error: unknown, code?: BillingErrorCode): error i
   )
 }
 
+export function isSocialFetchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+  return (
+    message.includes('caption') ||
+    message.includes('fetch') ||
+    message.includes('blocked') ||
+    message.includes('login') ||
+    message.includes('cookies') ||
+    message.includes('unavailable to automatic')
+  )
+}
+
 export function errorFromDetail(status: number, detail: unknown): Error {
   if (typeof detail === 'string') {
     return new ApiError(detail, status)
