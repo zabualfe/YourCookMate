@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
-import { BrandLogo } from '@/components/BrandLogo'
+import { HeaderBrandLogo } from '@/components/HeaderBrandLogo'
 import { colors, fonts } from '@/constants/theme'
 
 export default function TabLayout() {
@@ -18,7 +18,7 @@ export default function TabLayout() {
           color: colors.stone900,
         },
         headerShadowVisible: false,
-        headerTitle: () => <BrandLogo size="sm" />,
+        headerTitle: () => <HeaderBrandLogo />,
         tabBarActiveTintColor: colors.brand700,
         tabBarInactiveTintColor: colors.stone500,
         tabBarStyle: {
@@ -55,7 +55,7 @@ export default function TabLayout() {
         options={{
           title: 'Your Cook Mate',
           tabBarLabel: 'Add',
-          headerTitle: 'Add a recipe',
+          headerTitle: () => <HeaderBrandLogo />,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={size + 2} color={color} />
           ),
@@ -66,7 +66,7 @@ export default function TabLayout() {
         options={{
           title: 'Your Cook Mate',
           tabBarLabel: 'Profile',
-          headerTitle: 'Profile',
+          headerTitle: () => <HeaderBrandLogo />,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
           ),

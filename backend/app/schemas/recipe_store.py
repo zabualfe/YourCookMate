@@ -14,6 +14,8 @@ class CreateRecipeRequest(BaseModel):
     used_ai: bool = False
     source_type: str = "text"
     source_url: Optional[str] = None
+    allow_duplicate: bool = False
+    usage_already_recorded: bool = False
 
 
 class UpdateRecipeRequest(BaseModel):
@@ -28,6 +30,8 @@ class RecipeSummary(BaseModel):
     created_at: str
     collections: list[RecipeCollectionTag] = []
     icon_url: Optional[str] = None
+    locked: bool = False
+    visible_until: Optional[str] = None
 
 
 class RecipeDetailResponse(BaseModel):
@@ -45,6 +49,8 @@ class RecipeDetailResponse(BaseModel):
     share_url: Optional[str] = None
     collections: list[RecipeCollectionTag] = []
     icon_url: Optional[str] = None
+    locked: bool = False
+    visible_until: Optional[str] = None
 
 
 class RecipeListResponse(BaseModel):

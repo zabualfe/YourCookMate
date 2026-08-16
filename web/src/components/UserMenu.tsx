@@ -101,6 +101,9 @@ export function UserMenu() {
           <div className="border-b border-stone-100 px-4 py-2.5">
             <p className="truncate text-sm font-medium text-stone-900">{name}</p>
             <p className="truncate text-xs text-stone-500">{user.email}</p>
+            {user.is_pro && (
+              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-700">Pro</p>
+            )}
           </div>
           <Link
             to="/profile"

@@ -22,3 +22,4 @@ boto3>=1.35.0
 # crt extra lets botocore read the `aws login` credential provider (~/.aws/login)
 botocore[crt]>=1.35.0
 google-genai>=1.0.0
+stripe>=11.0.0

@@ -20,6 +20,7 @@ from app.schemas.collection import (
     CreateCollectionRequest,
     UpdateCollectionRequest,
 )
+from app.services.billing import recipe_is_locked, recipe_visible_until
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -101,6 +102,10 @@ def get_collection(
             step_count=len(link.recipe.parsed_json.get("steps", [])),
             used_ai=link.recipe.used_ai,
             created_at=link.recipe.created_at.isoformat(),
+            locked=recipe_is_locked(user, link.recipe),
+            visible_until=(
+                until.isoformat() if (until := recipe_visible_until(user, link.recipe)) else None
+            ),
         )
         for link in sorted(row.collection_recipes, key=lambda x: x.added_at, reverse=True)
     ]

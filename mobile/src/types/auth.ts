@@ -4,6 +4,8 @@ export interface User {
   display_name?: string | null
   avatar_url?: string | null
   email_verified: boolean
+  plan?: string
+  is_pro?: boolean
 }
 
 export interface AuthResponse {

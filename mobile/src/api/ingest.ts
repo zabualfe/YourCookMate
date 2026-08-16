@@ -92,8 +92,9 @@ export async function fetchLinkPreview(url: string): Promise<import('@/types/ing
 export async function ingestSocialLink(payload: {
   url: string
   caption?: string
+  force?: boolean
 }): Promise<IngestLinkResponse> {
-  if (!getAwsIngestBase()) {
+  if (!getAwsIngestBase() || __DEV__) {
     const { ingestSocialLinkSync } = await import('./client')
     return ingestSocialLinkSync(payload)
   }
@@ -103,6 +104,7 @@ export async function ingestSocialLink(payload: {
     body: JSON.stringify({
       url: payload.url,
       caption: payload.caption || undefined,
+      force: payload.force || undefined,
     }),
   })
   return pollIngestJob(queued.job_id)
@@ -112,6 +114,7 @@ export async function parseRecipeViaAws(payload: {
   raw_text: string
   source_url?: string
   video_duration?: number | null
+  force?: boolean
 }): Promise<import('@/types/recipe').ParseRecipeResponse> {
   return awsApiRequest('/recipes/parse', {
     method: 'POST',
@@ -119,6 +122,7 @@ export async function parseRecipeViaAws(payload: {
       raw_text: payload.raw_text,
       source_url: payload.source_url,
       video_duration: payload.video_duration ?? undefined,
+      force: payload.force || undefined,
     }),
   })
 }

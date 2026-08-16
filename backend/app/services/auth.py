@@ -134,10 +134,14 @@ def oauth_login(db: Session, provider: str, profile: dict) -> User:
 
 
 def user_to_dict(user: User) -> dict[str, Any]:
+    from app.services.billing import is_pro
+
     return {
         "id": str(user.id),
         "email": user.email,
         "display_name": user.display_name,
         "avatar_url": user.avatar_url,
         "email_verified": user.email_verified,
+        "plan": "pro" if is_pro(user) else "free",
+        "is_pro": is_pro(user),
     }

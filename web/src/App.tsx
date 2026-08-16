@@ -21,6 +21,8 @@ import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { VerifyEmailConfirmPage } from './pages/VerifyEmailConfirmPage'
 import { AuthMobilePage } from './pages/AuthMobilePage'
 import { AdminPage } from './pages/AdminPage'
+import { BillingSuccessPage } from './pages/BillingSuccessPage'
+import { PlansPage } from './pages/PlansPage'
 
 const queryClient = new QueryClient()
 
@@ -63,6 +65,8 @@ export default function App() {
             <Route path="/r/:slug" element={<SharedRecipePage />} />
             <Route path="/r/:slug/cook" element={<SharedCookPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/plans" element={<PlansPage />} />
+              <Route path="/billing/success" element={<BillingSuccessPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/verify-email/confirm" element={<VerifyEmailConfirmPage />} />

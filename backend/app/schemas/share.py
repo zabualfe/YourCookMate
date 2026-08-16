@@ -28,6 +28,8 @@ class SharedRecipeResponse(BaseModel):
     source_type: str = "text"
     source_url: Optional[str] = None
     icon_url: Optional[str] = None
+    locked: bool = False
+    visible_until: Optional[str] = None
 
 
 class CommunityRecipeSummary(BaseModel):

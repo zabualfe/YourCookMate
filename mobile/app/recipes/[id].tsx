@@ -3,10 +3,12 @@ import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
-import { getRecipe } from '@/api/client'
+import { getBillingUsage, getRecipe } from '@/api/client'
 import { RecipeIconEditor } from '@/components/RecipeIconEditor'
 import { StepMediaPreview } from '@/components/StepMediaPreview'
 import { ShopInstacartButton } from '@/components/ShopInstacartButton'
+import { UpgradePaywall } from '@/components/UpgradePaywall'
+import { VisibilityTimer } from '@/components/VisibilityTimer'
 import { colors, commonStyles, fonts, radii, spacing } from '@/constants/theme'
 
 export default function RecipeDetailScreen() {
@@ -17,6 +19,11 @@ export default function RecipeDetailScreen() {
     queryKey: ['recipe', id],
     queryFn: () => getRecipe(id!),
     enabled: !!id,
+  })
+  const { data: usage } = useQuery({
+    queryKey: ['billing-usage'],
+    queryFn: getBillingUsage,
+    enabled: !!data?.locked,
   })
 
   if (!id || isLoading) {
@@ -46,7 +53,8 @@ export default function RecipeDetailScreen() {
           title: data.title,
           headerBackTitle: 'Home',
           headerBackTitleVisible: false,
-          headerRight: () => (
+          headerRight: () =>
+            data.locked ? null : (
             <Pressable
               onPress={() => router.push(`/recipes/edit/${id}`)}
               hitSlop={8}
@@ -58,6 +66,10 @@ export default function RecipeDetailScreen() {
         }}
       />
       <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.screenContent}>
+        {data.locked ? (
+          <UpgradePaywall reason="expired" usage={usage} />
+        ) : (
+        <>
         <View style={styles.summary}>
           <View style={styles.heroRow}>
             <RecipeIconEditor
@@ -85,6 +97,7 @@ export default function RecipeDetailScreen() {
                   ? ` · ~${recipe.calories_per_serving} cal/serving`
                   : ''}
               </Text>
+              <VisibilityTimer locked={data.locked} visibleUntil={data.visible_until} />
             </View>
           </View>
 
@@ -150,6 +163,8 @@ export default function RecipeDetailScreen() {
             </View>
           </View>
         ))}
+        </>
+        )}
       </ScrollView>
     </>
   )

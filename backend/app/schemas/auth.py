@@ -27,6 +27,8 @@ class UserResponse(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     email_verified: bool = False
+    plan: str = "free"
+    is_pro: bool = False
 
 
 class VerifyEmailRequest(BaseModel):

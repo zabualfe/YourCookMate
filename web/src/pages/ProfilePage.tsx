@@ -1,10 +1,20 @@
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { InstacartConnectCard } from '../components/InstacartConnectCard'
+import { UpgradePaywall } from '../components/UpgradePaywall'
 import { useAuth } from '../context/AuthContext'
+import { getBillingPlans } from '../api/client'
+import { ProBillingActions } from '../components/ProBillingActions'
+import { uploadsLeftLabel, videoLimitLabel } from '../types/billing'
 
 export function ProfilePage() {
   const { user, isAuthenticated, loading } = useAuth()
+  const { data: billing } = useQuery({
+    queryKey: ['billing-plans'],
+    queryFn: getBillingPlans,
+    enabled: isAuthenticated,
+  })
 
   if (loading) {
     return (
@@ -26,6 +36,9 @@ export function ProfilePage() {
       </Layout>
     )
   }
+
+  const usage = billing?.usage
+  const isPro = billing?.is_pro ?? user.is_pro
 
   return (
     <Layout>
@@ -51,6 +64,14 @@ export function ProfilePage() {
             </p>
             <p className="truncate text-sm text-stone-500">{user.email}</p>
             <p className="mt-1 text-xs text-stone-500">
+              {isPro ? (
+                <span className="font-medium text-brand-700">
+                  {billing?.cancel_at_period_end ? 'Pro · canceling' : 'Pro'}
+                </span>
+              ) : (
+                <span>Free plan</span>
+              )}
+              {' · '}
               {user.email_verified ? (
                 <span className="text-green-700">Email verified</span>
               ) : (
@@ -64,6 +85,36 @@ export function ProfilePage() {
             </p>
           </div>
         </div>
+
+        <section className="mt-6 rounded-2xl border border-stone-200 bg-white p-6">
+          <h2 className="text-base font-semibold text-stone-900">Plan</h2>
+          {usage && (
+            <p className="mt-1 text-sm text-stone-600">
+              {uploadsLeftLabel(usage)} · videos up to {videoLimitLabel(usage.max_video_seconds)}
+              {usage.visibility_days ? ` · ${usage.visibility_days}-day viewing window` : ' · recipes stay in your library'}
+            </p>
+          )}
+          <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              <span className="font-medium text-stone-800">Free:</span> 2 uploads/day, 1-minute videos,
+              14-day recipe access
+            </li>
+            <li>
+              <span className="font-medium text-stone-800">Pro:</span> 10 uploads/day, 3-minute videos,
+              unlimited viewing
+              {billing?.plans.find((p) => p.id === 'pro')?.price_display
+                ? ` (${billing.plans.find((p) => p.id === 'pro')?.price_display})`
+                : ''}
+            </li>
+          </ul>
+          <div className="mt-4">
+            {isPro && billing ? (
+              <ProBillingActions billing={billing} />
+            ) : (
+              <UpgradePaywall reason="upgrade" usage={usage} compact />
+            )}
+          </div>
+        </section>
 
         <InstacartConnectCard />
 

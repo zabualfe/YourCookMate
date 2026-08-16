@@ -12,8 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import * as Haptics from 'expo-haptics'
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
-import { getRecipe } from '@/api/client'
+import { getBillingUsage, getRecipe } from '@/api/client'
 import { StepMediaPreview } from '@/components/StepMediaPreview'
+import { UpgradePaywall } from '@/components/UpgradePaywall'
 import { colors, commonStyles, fonts, radii, spacing } from '@/constants/theme'
 
 export default function CookScreen() {
@@ -26,6 +27,11 @@ export default function CookScreen() {
     queryKey: ['recipe', id],
     queryFn: () => getRecipe(id!),
     enabled: !!id,
+  })
+  const { data: usage } = useQuery({
+    queryKey: ['billing-usage'],
+    queryFn: getBillingUsage,
+    enabled: !!data?.locked,
   })
 
   useEffect(() => {
@@ -49,6 +55,17 @@ export default function CookScreen() {
         <Text style={commonStyles.errorBannerText}>
           {error instanceof Error ? error.message : 'Recipe not found'}
         </Text>
+      </View>
+    )
+  }
+
+  if (data.locked) {
+    return (
+      <View style={[styles.container, styles.center, { padding: spacing.lg }]}>
+        <UpgradePaywall reason="expired" usage={usage} />
+        <Pressable onPress={() => router.back()} style={{ marginTop: spacing.lg }}>
+          <Text style={commonStyles.linkText}>Back</Text>
+        </Pressable>
       </View>
     )
   }

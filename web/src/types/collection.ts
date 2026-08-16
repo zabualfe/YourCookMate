@@ -22,6 +22,8 @@ export interface CollectionRecipeSummary {
   step_count: number
   used_ai: boolean
   created_at: string
+  locked?: boolean
+  visible_until?: string | null
 }
 
 export interface CollectionDetailResponse {

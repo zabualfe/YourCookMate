@@ -19,6 +19,11 @@ export interface IngestLinkResponse {
   video_duration?: number | null
   extraction_notes: string[]
   confidence: number
+  from_cache?: boolean
+  existing_recipe_id?: string | null
+  used_ai?: boolean | null
+  recipe?: ParsedRecipe | null
+  found?: boolean
 }
 
 export interface LinkPreviewResponse {
@@ -39,6 +44,8 @@ export interface ReviewDraft {
   sourceType?: string
   sourceUrl?: string
   extractionNotes?: string[]
+  allowDuplicate?: boolean
+  usageAlreadyRecorded?: boolean
 }
 
 export function videoPlatformLabel(sourceType: string): string {

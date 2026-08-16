@@ -87,13 +87,67 @@ def _migrate_schema() -> None:
                 conn.execute(text("ALTER TABLE recipes ADD COLUMN instacart_link_url VARCHAR(2048)"))
             if "instacart_ingredients_hash" not in recipe_cols:
                 conn.execute(text("ALTER TABLE recipes ADD COLUMN instacart_ingredients_hash VARCHAR(64)"))
+            if "expires_at" not in recipe_cols:
+                conn.execute(text("ALTER TABLE recipes ADD COLUMN expires_at TIMESTAMP WITH TIME ZONE"))
+            if "source_key" not in recipe_cols:
+                conn.execute(text("ALTER TABLE recipes ADD COLUMN source_key VARCHAR(128)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_recipes_source_key ON recipes (source_key)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_recipes_source_url ON recipes (source_url)"))
+
+
+def _backfill_source_keys() -> None:
+    from sqlalchemy import inspect
+
+    insp = inspect(engine)
+    if "recipes" not in insp.get_table_names():
+        return
+    recipe_cols = {c["name"] for c in insp.get_columns("recipes")}
+    if "source_key" not in recipe_cols:
+        return
+
+    from app.models.recipe import Recipe
+    from app.services.source_key import canonical_source_key
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Recipe)
+            .filter(Recipe.source_url.isnot(None), Recipe.source_key.is_(None))
+            .all()
+        )
+        changed = False
+        for row in rows:
+            key = canonical_source_key(row.source_url or "", row.source_type)
+            if key:
+                row.source_key = key
+                changed = True
+        if changed:
+            db.commit()
+    finally:
+        db.close()
+
+    user_cols = {c["name"] for c in insp.get_columns("users")}
+    with engine.begin() as conn:
+        if "stripe_customer_id" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255)"))
+        if "stripe_subscription_id" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(255)"))
+        if "plan" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN plan VARCHAR(32) NOT NULL DEFAULT 'free'"))
+        if "subscription_status" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN subscription_status VARCHAR(32)"))
+        if "subscription_current_period_end" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN subscription_current_period_end TIMESTAMP WITH TIME ZONE"))
+        if "cancel_at_period_end" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE"))
 
 
 def init_db() -> None:
-    from app.models import collection, email_verification_token, feature_flag, job, oauth_account, recipe, user  # noqa: F401
+    from app.models import collection, email_verification_token, feature_flag, job, oauth_account, recipe, source_import, usage, user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _migrate_schema()
+    _backfill_source_keys()
 
     from app.services.feature_flag_store import seed_feature_flags
 

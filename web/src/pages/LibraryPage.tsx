@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout'
 import { RecipeCollectionChips } from '../components/RecipeCollectionChips'
 import { CollectionQuickAdd } from '../components/CollectionPicker'
 import { RecipeIcon } from '../components/RecipeIcon'
+import { VisibilityTimer } from '../components/VisibilityTimer'
 import { useAuth } from '../context/AuthContext'
 import { deleteRecipe, listRecipes } from '../api/client'
 
@@ -94,21 +95,35 @@ export function LibraryPage() {
                 <RecipeIcon recipeId={item.id} iconUrl={item.icon_url} size="sm" />
                 <Link to={`/recipes/${item.id}`} className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-stone-900">{item.title}</p>
-                  <p className="text-sm text-stone-500">
-                    {item.step_count} steps · {new Date(item.created_at).toLocaleDateString()}
-                  </p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <p className="text-sm text-stone-500">
+                      {item.locked
+                        ? 'Locked after 14 days — upgrade to view'
+                        : `${item.step_count} steps · ${new Date(item.created_at).toLocaleDateString()}`}
+                    </p>
+                    <VisibilityTimer locked={item.locked} visibleUntil={item.visible_until} />
+                  </div>
                   <RecipeCollectionChips collections={item.collections ?? []} />
                 </Link>
                 <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-                  {(item.collections?.length ?? 0) === 0 && (
+                  {(item.collections?.length ?? 0) === 0 && !item.locked && (
                     <CollectionQuickAdd recipeId={item.id} collections={item.collections ?? []} />
                   )}
-                  <Link
-                    to={`/cook/${item.id}`}
-                    className="rounded-lg bg-brand-50 px-3 py-2 text-center text-sm font-medium text-brand-700 hover:bg-brand-100"
-                  >
-                    Cook
-                  </Link>
+                  {item.locked ? (
+                    <Link
+                      to={`/recipes/${item.id}`}
+                      className="rounded-lg bg-amber-50 px-3 py-2 text-center text-sm font-medium text-amber-800 hover:bg-amber-100"
+                    >
+                      Unlock
+                    </Link>
+                  ) : (
+                    <Link
+                      to={`/cook/${item.id}`}
+                      className="rounded-lg bg-brand-50 px-3 py-2 text-center text-sm font-medium text-brand-700 hover:bg-brand-100"
+                    >
+                      Cook
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => {

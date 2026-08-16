@@ -11,6 +11,7 @@ from app.routers.share import _author_name
 from app.schemas.share import CommunityRecipeListResponse, CommunityRecipeSummary
 from app.services.feature_flags import require_community_enabled
 from app.services.recipe_icons import icon_public_url
+from app.services.billing import recipe_is_locked
 
 router = APIRouter(prefix="/community", tags=["community"])
 
@@ -44,6 +45,6 @@ def list_community_recipes(
             icon_url=icon_public_url(row.icon_path),
         )
         for row in rows
-        if row.share_slug
+        if row.share_slug and not recipe_is_locked(row.user, row)
     ]
     return CommunityRecipeListResponse(items=items, total=len(items))

@@ -223,12 +223,31 @@ class Settings(BaseSettings):
 
     admin_emails: str = "zabualfe@gmail.com"
 
+    stripe_secret_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("STRIPE_SECRET_KEY", "stripe_secret_key"),
+    )
+    stripe_webhook_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("STRIPE_WEBHOOK_SECRET", "stripe_webhook_secret"),
+    )
+    stripe_price_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("STRIPE_PRICE_ID", "stripe_price_id"),
+    )
+    stripe_pro_price_label: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("STRIPE_PRO_PRICE_LABEL", "stripe_pro_price_label"),
+    )
+
     @field_validator(
         "openai_api_key",
         "gemini_api_key",
         "resend_api_key",
         "email_api_secret",
         "google_client_secret",
+        "stripe_secret_key",
+        "stripe_webhook_secret",
         mode="before",
     )
     @classmethod

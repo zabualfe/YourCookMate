@@ -95,6 +95,8 @@ export function ReviewPage() {
           used_ai: usedAi,
           source_type: sourceType ?? 'text',
           source_url: sourceUrl,
+          allow_duplicate: draft.allowDuplicate,
+          usage_already_recorded: draft.usageAlreadyRecorded,
         })
         sessionStorage.removeItem('yourcookmate_review')
         navigate(destination === 'cook' ? `/cook/${saved.id}` : `/recipes/${saved.id}`)

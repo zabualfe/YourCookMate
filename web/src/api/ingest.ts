@@ -1,9 +1,9 @@
 import type { IngestLinkResponse } from '../types/ingest'
 
-const BUILD_TIME_AWS_BASE = (
-  (import.meta.env.VITE_AWS_API_URL as string | undefined) ||
-  (import.meta.env.VITE_API_URL as string | undefined)
-)?.replace(/\/$/, '')
+const BUILD_TIME_AWS_BASE = (import.meta.env.VITE_AWS_API_URL as string | undefined)?.replace(
+  /\/$/,
+  '',
+)
 
 /** Runtime override from /api/features (Vercel env without rebuild). */
 let runtimeAwsBase: string | undefined = BUILD_TIME_AWS_BASE
@@ -97,8 +97,9 @@ export async function fetchLinkPreview(url: string): Promise<import('../types/in
 export async function ingestSocialLink(payload: {
   url: string
   caption?: string
+  force?: boolean
 }): Promise<IngestLinkResponse> {
-  if (!getAwsIngestBase()) {
+  if (!getAwsIngestBase() || import.meta.env.DEV) {
     const { ingestSocialLinkSync } = await import('./client')
     return ingestSocialLinkSync(payload)
   }
@@ -108,6 +109,7 @@ export async function ingestSocialLink(payload: {
     body: JSON.stringify({
       url: payload.url,
       caption: payload.caption || undefined,
+      force: payload.force || undefined,
     }),
   })
   return pollIngestJob(queued.job_id)
@@ -118,6 +120,7 @@ export async function parseRecipeViaAws(payload: {
   raw_text: string
   source_url?: string
   video_duration?: number | null
+  force?: boolean
 }): Promise<import('../types/recipe').ParseRecipeResponse> {
   return awsApiRequest('/recipes/parse', {
     method: 'POST',
@@ -125,6 +128,7 @@ export async function parseRecipeViaAws(payload: {
       raw_text: payload.raw_text,
       source_url: payload.source_url,
       video_duration: payload.video_duration ?? undefined,
+      force: payload.force || undefined,
     }),
   })
 }

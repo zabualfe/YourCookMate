@@ -9,6 +9,8 @@ import type {
   RecipeListResponse,
 } from '@/types/recipe'
 import type { IngestLinkResponse } from '@/types/ingest'
+import type { BillingPlansResponse, UsageSnapshot } from '@/types/billing'
+import { errorFromDetail } from '@/api/errors'
 
 const TOKEN_KEY = 'yourcookmate_token'
 
@@ -33,13 +35,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const detail = (body as { detail?: unknown }).detail
-    const message =
-      typeof detail === 'string'
-        ? detail
-        : Array.isArray(detail)
-          ? detail.map((d: { msg?: string }) => d.msg ?? '').filter(Boolean).join(', ')
-          : `Request failed (${res.status})`
-    throw new Error(message)
+    throw errorFromDetail(res.status, detail)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -85,6 +81,45 @@ export async function register(
 
 export async function fetchMe(): Promise<User> {
   return request('/auth/me')
+}
+
+export async function getBillingPlans(): Promise<BillingPlansResponse> {
+  return request('/billing/plans')
+}
+
+export async function getBillingUsage(): Promise<UsageSnapshot> {
+  return request('/billing/usage')
+}
+
+export async function checkUpload(videoDuration?: number | null): Promise<UsageSnapshot> {
+  return request('/billing/check-upload', {
+    method: 'POST',
+    body: JSON.stringify({
+      video_duration: videoDuration ?? undefined,
+    }),
+  })
+}
+
+export async function startCheckout(
+  successPath = '/billing/success',
+  cancelPath = '/profile',
+): Promise<{ url: string }> {
+  return request('/billing/checkout', {
+    method: 'POST',
+    body: JSON.stringify({ success_path: successPath, cancel_path: cancelPath }),
+  })
+}
+
+export async function startBillingPortal(): Promise<{ url: string }> {
+  return request('/billing/portal', { method: 'POST' })
+}
+
+export async function cancelPlan(): Promise<BillingPlansResponse> {
+  return request('/billing/cancel', { method: 'POST' })
+}
+
+export async function resumePlan(): Promise<BillingPlansResponse> {
+  return request('/billing/resume', { method: 'POST' })
 }
 
 export interface AppFeatures {
@@ -134,6 +169,7 @@ export async function parseRecipe(
     raw_text: string
     source_url?: string
     video_duration?: number | null
+    force?: boolean
   },
 ): Promise<ParseRecipeResponse> {
   const body =
@@ -143,6 +179,7 @@ export async function parseRecipe(
           raw_text: payload.raw_text,
           source_url: payload.source_url,
           video_duration: payload.video_duration ?? undefined,
+          force: payload.force || undefined,
         }
 
   const { ingestUsesAws, parseRecipeViaAws } = await import('./ingest')
@@ -159,6 +196,7 @@ export async function parseRecipe(
 export async function ingestSocialLink(payload: {
   url: string
   caption?: string
+  force?: boolean
 }): Promise<IngestLinkResponse> {
   const { ingestSocialLink: ingestViaAws } = await import('./ingest')
   return ingestViaAws(payload)
@@ -167,13 +205,22 @@ export async function ingestSocialLink(payload: {
 export async function ingestSocialLinkSync(payload: {
   url: string
   caption?: string
+  force?: boolean
 }): Promise<IngestLinkResponse> {
   return request('/ingest/link', {
     method: 'POST',
     body: JSON.stringify({
       url: payload.url,
       caption: payload.caption || undefined,
+      force: payload.force || undefined,
     }),
+  })
+}
+
+export async function lookupSocialLink(url: string): Promise<IngestLinkResponse> {
+  return request('/ingest/lookup', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
   })
 }
 
@@ -211,6 +258,8 @@ export async function saveRecipe(payload: {
   used_ai: boolean
   source_type?: string
   source_url?: string
+  allow_duplicate?: boolean
+  usage_already_recorded?: boolean
 }): Promise<RecipeDetailResponse> {
   return request('/recipes', {
     method: 'POST',
@@ -220,6 +269,8 @@ export async function saveRecipe(payload: {
       used_ai: payload.used_ai,
       source_type: payload.source_type ?? 'text',
       source_url: payload.source_url ?? null,
+      allow_duplicate: payload.allow_duplicate || undefined,
+      usage_already_recorded: payload.usage_already_recorded || undefined,
     }),
   })
 }

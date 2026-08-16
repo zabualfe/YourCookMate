@@ -184,13 +184,13 @@ def classify_video_url(url: str) -> str:
     parsed = urlparse(url)
     host = parsed.netloc.lower().removeprefix("www.")
 
-    if host in {"instagram.com", "instagr.am"}:
+    if host in {"instagram.com", "instagr.am", "l.instagram.com"}:
         return "instagram"
     if host.endswith("tiktok.com") or host in {"vm.tiktok.com", "vt.tiktok.com"}:
         return "tiktok"
     if host in {"youtube.com", "m.youtube.com", "music.youtube.com"} or host == "youtu.be":
         return "youtube"
-    if host in {"facebook.com", "m.facebook.com", "web.facebook.com", "fb.watch", "fb.com"}:
+    if host in {"facebook.com", "m.facebook.com", "web.facebook.com", "fb.watch", "fb.com", "l.facebook.com"}:
         return "facebook"
     if "pinterest.com" in host or host == "pin.it":
         return "pinterest"
@@ -669,6 +669,22 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
             duration = float(duration)
         else:
             duration = None
+        webpage = info.get("webpage_url")
+        if isinstance(webpage, str) and webpage.startswith("http"):
+            try:
+                source_url = _normalize_url(webpage)
+                source_type = classify_video_url(source_url)
+            except HTTPException:
+                pass
+        canonical_id = info.get("id")
+        if isinstance(canonical_id, (int, float)):
+            canonical_id = str(int(canonical_id))
+        if not isinstance(canonical_id, str) or not canonical_id.strip():
+            canonical_id = None
+        else:
+            canonical_id = canonical_id.strip()
+    else:
+        canonical_id = None
 
     # Prefer the user's pasted caption when automatic description is missing/weak.
     if provided_caption:
@@ -733,6 +749,7 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
             had_transcript=bool(transcript),
             had_vision=bool(visual_text),
         ),
+        "canonical_id": canonical_id,
     }
 
 

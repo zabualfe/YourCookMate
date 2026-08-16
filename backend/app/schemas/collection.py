@@ -32,6 +32,8 @@ class CollectionRecipeSummary(BaseModel):
     step_count: int
     used_ai: bool
     created_at: str
+    locked: bool = False
+    visible_until: Optional[str] = None
 
 
 class CollectionDetailResponse(BaseModel):

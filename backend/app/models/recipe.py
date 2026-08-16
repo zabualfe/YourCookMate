@@ -26,7 +26,8 @@ class Recipe(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(String(32), default="text", nullable=False)
-    source_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+    source_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True, index=True)
+    source_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     parsed_json: Mapped[dict] = mapped_column(JSONStore, nullable=False)
     used_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Legacy flag — link access is gated by share_slug alone (unlisted). Kept for older rows.
@@ -38,6 +39,7 @@ class Recipe(Base):
     icon_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     instacart_link_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     instacart_ingredients_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

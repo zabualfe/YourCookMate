@@ -13,7 +13,9 @@ import { ShopInstacartButton } from '../components/ShopInstacartButton'
 import { RecipeIcon } from '../components/RecipeIcon'
 import { CookwareIcon, PencilIcon } from '../components/icons'
 import { getRecipe as getLocalRecipe, saveRecipe as saveLocalRecipe } from '../lib/storage'
-import { getRecipe as getRecipeApi, updateRecipe } from '../api/client'
+import { UpgradePaywall } from '../components/UpgradePaywall'
+import { VisibilityTimer } from '../components/VisibilityTimer'
+import { getBillingUsage, getRecipe as getRecipeApi, updateRecipe } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type { ParsedRecipe, RecipeListResponse } from '../types/recipe'
 
@@ -36,6 +38,11 @@ export function RecipeDetailPage() {
     queryFn: () => getRecipeApi(id!),
     enabled: !!id && isAuthenticated,
     retry: false,
+  })
+  const { data: usage } = useQuery({
+    queryKey: ['billing-usage'],
+    queryFn: getBillingUsage,
+    enabled: isAuthenticated && !!data?.locked,
   })
 
   useEffect(() => {
@@ -78,6 +85,8 @@ export function RecipeDetailPage() {
         share_url: data.share_url,
         source_url: data.source_url,
         isLocal: false,
+        locked: data.locked ?? false,
+        visible_until: data.visible_until ?? null,
       }
     : local
       ? {
@@ -94,6 +103,8 @@ export function RecipeDetailPage() {
           share_url: undefined as string | undefined,
           source_url: local.sourceUrl,
           isLocal: true,
+          locked: false,
+          visible_until: null as string | null,
         }
       : null
 
@@ -211,7 +222,7 @@ export function RecipeDetailPage() {
               <RecipeIcon
                 recipeId={detail.id}
                 iconUrl={iconUrl}
-                editable={!editing}
+                editable={!editing && !detail.locked}
                 isLocal={detail.isLocal}
                 onIconChange={(url) => {
                   setIconUrl(url)
@@ -313,6 +324,11 @@ export function RecipeDetailPage() {
               ) : (
                 <>
                   <p className="mt-1 text-sm text-stone-500">{metaParts.join(' · ')}</p>
+                  <VisibilityTimer
+                    className="mt-2"
+                    locked={detail.locked}
+                    visibleUntil={detail.visible_until}
+                  />
                   <RecipeNutritionInfo recipe={displayRecipe} className="mt-2" />
                 </>
               )}
@@ -326,7 +342,7 @@ export function RecipeDetailPage() {
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {editing ? (
+              {detail.locked ? null : editing ? (
                 <>
                   <button
                     type="button"
@@ -390,7 +406,11 @@ export function RecipeDetailPage() {
           )}
         </div>
 
-        {editing && draft ? (
+        {detail.locked ? (
+          <div className="mt-6">
+            <UpgradePaywall reason="expired" usage={usage} />
+          </div>
+        ) : editing && draft ? (
           <RecipeEditor
             draft={draft}
             onChange={setDraft}

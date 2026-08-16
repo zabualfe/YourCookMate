@@ -41,6 +41,7 @@ class ParseRecipeRequest(BaseModel):
     raw_text: str = Field(min_length=10, max_length=50000)
     source_url: Optional[str] = Field(default=None, max_length=2048)
     video_duration: Optional[float] = Field(default=None, ge=0)
+    force: bool = False
 
 
 class ParseRecipeResponse(BaseModel):

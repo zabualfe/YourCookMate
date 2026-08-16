@@ -14,6 +14,7 @@ from app.schemas.share import SharedRecipeResponse
 from app.schemas.shop import InstacartLinkResponse
 from app.services.instacart import get_or_create_instacart_link
 from app.services.recipe_icons import icon_public_url
+from app.services.billing import recipe_is_locked
 
 router = APIRouter(prefix="/r", tags=["share"])
 
@@ -34,6 +35,11 @@ def _get_shared_recipe(db: Session, slug: str) -> Recipe:
     )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shared recipe not found")
+    if recipe_is_locked(row.user, row):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This recipe is no longer available. The owner needs Pro to keep it visible after 14 days.",
+        )
     return row
 
 

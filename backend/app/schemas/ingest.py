@@ -4,10 +4,17 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.recipe import ParsedRecipe
+
 
 class IngestLinkRequest(BaseModel):
     url: str = Field(min_length=10, max_length=2048)
     caption: Optional[str] = Field(default=None, max_length=50000)
+    force: bool = False
+
+
+class IngestLookupRequest(BaseModel):
+    url: str = Field(min_length=10, max_length=2048)
 
 
 class LinkPreviewRequest(BaseModel):
@@ -24,6 +31,11 @@ class IngestLinkResponse(BaseModel):
     video_duration: Optional[float] = None
     extraction_notes: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
+    from_cache: bool = False
+    existing_recipe_id: Optional[str] = None
+    used_ai: Optional[bool] = None
+    recipe: Optional[ParsedRecipe] = None
+    found: bool = False
 
 
 class LinkPreviewResponse(BaseModel):

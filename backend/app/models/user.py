@@ -20,6 +20,12 @@ class User(Base):
     display_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    plan: Mapped[str] = mapped_column(String(32), default="free", nullable=False)
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    subscription_current_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     oauth_accounts: Mapped[list["OAuthAccount"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -28,3 +34,4 @@ class User(Base):
     )
     recipes: Mapped[list["Recipe"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     collections: Mapped[list["Collection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    usage_records: Mapped[list["UsageRecord"]] = relationship(back_populates="user", cascade="all, delete-orphan")

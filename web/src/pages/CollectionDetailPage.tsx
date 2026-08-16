@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { getCollection, removeRecipeFromCollection, updateCollection } from '../api/client'
+import { VisibilityTimer } from '../components/VisibilityTimer'
 
 export function CollectionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -124,14 +125,28 @@ export function CollectionDetailPage() {
             >
               <Link to={`/recipes/${item.id}`} className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-stone-900">{item.title}</p>
-                <p className="text-sm text-stone-500">{item.step_count} steps</p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-stone-500">
+                    {item.locked ? 'Locked after 14 days — upgrade to view' : `${item.step_count} steps`}
+                  </p>
+                  <VisibilityTimer locked={item.locked} visibleUntil={item.visible_until} />
+                </div>
               </Link>
-              <Link
-                to={`/cook/${item.id}`}
-                className="shrink-0 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100"
-              >
-                Cook
-              </Link>
+              {item.locked ? (
+                <Link
+                  to={`/recipes/${item.id}`}
+                  className="shrink-0 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100"
+                >
+                  Unlock
+                </Link>
+              ) : (
+                <Link
+                  to={`/cook/${item.id}`}
+                  className="shrink-0 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100"
+                >
+                  Cook
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => removeMutation.mutate(item.id)}

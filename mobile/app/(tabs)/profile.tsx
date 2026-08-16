@@ -8,12 +8,22 @@ import {
   Text,
   View,
 } from 'react-native'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/context/AuthContext'
 import { InstacartConnectCard } from '@/components/InstacartConnectCard'
+import { ProBillingActions } from '@/components/ProBillingActions'
+import { UpgradePaywall } from '@/components/UpgradePaywall'
+import { getBillingPlans } from '@/api/client'
+import { uploadsLeftLabel, videoLimitLabel } from '@/types/billing'
 import { colors, commonStyles, fonts, radii, spacing } from '@/constants/theme'
 
 export default function ProfileScreen() {
   const { user, loading, isAuthenticated, logout } = useAuth()
+  const { data: billing } = useQuery({
+    queryKey: ['billing-plans'],
+    queryFn: getBillingPlans,
+    enabled: isAuthenticated,
+  })
 
   if (loading) {
     return (
@@ -39,6 +49,8 @@ export default function ProfileScreen() {
   }
 
   const initials = (user.display_name ?? user.email).slice(0, 2).toUpperCase()
+  const usage = billing?.usage
+  const isPro = billing?.is_pro ?? user.is_pro
 
   return (
     <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.screenContent}>
@@ -58,9 +70,30 @@ export default function ProfileScreen() {
             {user.email}
           </Text>
           <Text style={user.email_verified ? styles.verified : styles.unverified}>
+            {isPro ? (billing?.cancel_at_period_end ? 'Pro · canceling' : 'Pro') : 'Free plan'}
+            {' · '}
             {user.email_verified ? 'Email verified' : 'Email not verified'}
           </Text>
         </View>
+      </View>
+
+      <View style={styles.planCard}>
+        <Text style={styles.planTitle}>Plan</Text>
+        {usage ? (
+          <Text style={styles.planMeta}>
+            {uploadsLeftLabel(usage)} · videos up to {videoLimitLabel(usage.max_video_seconds)}
+            {usage.visibility_days
+              ? ` · ${usage.visibility_days}-day viewing window`
+              : ' · recipes stay in your library'}
+          </Text>
+        ) : null}
+        {isPro && billing ? (
+          <ProBillingActions billing={billing} />
+        ) : (
+          <View style={{ marginTop: spacing.lg }}>
+            <UpgradePaywall reason="upgrade" usage={usage} />
+          </View>
+        )}
       </View>
 
       <InstacartConnectCard />
@@ -122,6 +155,26 @@ const styles = StyleSheet.create({
     borderColor: colors.stone200,
     backgroundColor: colors.white,
     padding: spacing.xl,
+  },
+  planCard: {
+    marginTop: spacing.lg,
+    borderRadius: radii.xxl,
+    borderWidth: 1,
+    borderColor: colors.stone200,
+    backgroundColor: colors.white,
+    padding: spacing.xl,
+  },
+  planTitle: {
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 16,
+    color: colors.stone900,
+  },
+  planMeta: {
+    marginTop: spacing.sm,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.stone600,
   },
   avatar: {
     width: 64,

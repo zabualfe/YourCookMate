@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
 import { useFeatures } from '../context/FeaturesContext'
 import { listCollections } from '../api/client'
+import { SidebarAccount } from './SidebarAccount'
 
 function navClass({ isActive }: { isActive: boolean }) {
   return [
@@ -33,8 +34,8 @@ export function SidebarNav() {
 
   return (
     <>
-      <aside className="hidden w-60 shrink-0 border-r border-stone-200 bg-white md:flex md:flex-col">
-        <nav className="flex flex-1 flex-col gap-1 p-4">
+      <aside className="hidden h-full min-h-0 w-60 shrink-0 flex-col border-r border-stone-200 bg-white md:flex">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-4">
           <NavLink to="/recipes" className={navClass}>
             <BookIcon />
             My Recipes
@@ -109,12 +110,16 @@ export function SidebarNav() {
             </NavLink>
           )}
         </nav>
+        <div className="mt-auto shrink-0 border-t border-stone-200 bg-white">
+          <SidebarAccount />
+        </div>
       </aside>
 
       <nav className="flex gap-1 overflow-x-auto border-b border-stone-200 bg-white px-3 py-2 md:hidden">
         <MobileNavLink to="/recipes">My Recipes</MobileNavLink>
         <MobileNavLink to="/collections">Collections</MobileNavLink>
         {features.community && <MobileNavLink to="/community">Community</MobileNavLink>}
+        <MobileNavLink to="/plans">Plans</MobileNavLink>
       </nav>
     </>
   )

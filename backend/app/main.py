@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import init_db
 from app.schemas.features import FeaturesResponse
 from app.services.feature_flags import build_features_response
-from app.routers import admin, auth, collections, community, recipes, share
+from app.routers import admin, auth, billing, collections, community, recipes, share
 from app.services.recipe_icons import uploads_root
 
 LAMBDA_MODE = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
@@ -64,6 +64,7 @@ app.add_middleware(
 
 app.include_router(admin.router)
 app.include_router(auth.router)
+app.include_router(billing.router)
 if not LAMBDA_MODE:
     from app.routers import ingest
 

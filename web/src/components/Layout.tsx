@@ -19,7 +19,17 @@ function shouldShowSidebar(pathname: string, hideNav?: boolean, override?: boole
   if (pathname.startsWith('/verify-email')) return false
   if (pathname.startsWith('/cook/')) return false
 
-  const sidebarRoots = ['/recipes', '/collections', '/community', '/profile', '/new', '/r']
+  const sidebarRoots = [
+    '/recipes',
+    '/collections',
+    '/community',
+    '/profile',
+    '/plans',
+    '/new',
+    '/r',
+    '/billing',
+    '/admin',
+  ]
   return sidebarRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`))
 }
 
@@ -30,21 +40,27 @@ export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
   const sidebarVisible = shouldShowSidebar(pathname, hideNav, showSidebar)
 
   return (
-    <div className="min-h-dvh flex flex-col bg-surface">
+    <div
+      className={
+        sidebarVisible
+          ? 'flex h-dvh flex-col overflow-hidden bg-surface'
+          : 'flex min-h-dvh flex-col bg-surface'
+      }
+    >
       {!hideNav && (
         <>
           {user && !user.email_verified && (
-            <div className="border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-center text-sm text-amber-900 sm:px-8">
+            <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-center text-sm text-amber-900 sm:px-8">
               Verify your email to save recipes.{' '}
               <Link to="/verify-email" className="font-semibold underline hover:text-amber-950">
                 Check inbox or resend link
               </Link>
             </div>
           )}
-          <header className="sticky top-0 z-40 border-b border-stone-200/70 bg-white/95 backdrop-blur-md">
+          <header className="sticky top-0 z-40 shrink-0 border-b border-stone-200/70 bg-white/95 backdrop-blur-md">
             <div className="flex h-14 w-full items-center justify-between gap-4 px-5 sm:px-8">
               <Link
-                to="/"
+                to={isAuthenticated ? '/recipes' : '/'}
                 className="flex shrink-0 items-center font-semibold text-stone-900 transition hover:opacity-80"
               >
                 <BrandLogo showBadge={false} />
@@ -78,9 +94,9 @@ export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
         </>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
         {sidebarVisible && <SidebarNav />}
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   )

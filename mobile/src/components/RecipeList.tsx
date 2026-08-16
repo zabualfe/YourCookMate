@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext'
 import { deleteRecipe, listRecipes } from '@/api/client'
 import { HomeHero } from '@/components/HomeHero'
 import { RecipeIcon } from '@/components/RecipeIcon'
+import { VisibilityTimer } from '@/components/VisibilityTimer'
 import { colors, commonStyles, fonts, radii, spacing } from '@/constants/theme'
 
 export function RecipeList() {
@@ -129,16 +130,21 @@ export function RecipeList() {
               {item.title}
             </Text>
             <Text style={styles.recipeMeta}>
-              {item.step_count} steps · {new Date(item.created_at).toLocaleDateString()}
+              {item.locked
+                ? 'Locked after 14 days — upgrade to view'
+                : `${item.step_count} steps · ${new Date(item.created_at).toLocaleDateString()}`}
             </Text>
+            <VisibilityTimer locked={item.locked} visibleUntil={item.visible_until} />
           </Pressable>
           <View style={styles.recipeActions}>
             <Pressable
-              onPress={() => router.push(`/cook/${item.id}`)}
-              style={styles.cookBtn}
-              accessibilityLabel={`Cook ${item.title}`}
+              onPress={() => router.push(item.locked ? `/recipes/${item.id}` : `/cook/${item.id}`)}
+              style={item.locked ? styles.unlockBtn : styles.cookBtn}
+              accessibilityLabel={item.locked ? `Unlock ${item.title}` : `Cook ${item.title}`}
             >
-              <Text style={styles.cookBtnText}>Cook</Text>
+              <Text style={item.locked ? styles.unlockBtnText : styles.cookBtnText}>
+                {item.locked ? 'Unlock' : 'Cook'}
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => confirmDelete(item.id)}
@@ -245,6 +251,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displaySemiBold,
     fontSize: 14,
     color: colors.brand700,
+  },
+  unlockBtn: {
+    minHeight: 36,
+    borderRadius: radii.sm,
+    backgroundColor: colors.accent50,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unlockBtnText: {
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 14,
+    color: colors.accent700,
   },
   deleteBtn: {
     minHeight: 36,

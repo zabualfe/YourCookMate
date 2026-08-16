@@ -58,6 +58,8 @@ export interface RecipeSummary {
   created_at: string
   collections?: RecipeCollectionTag[]
   icon_url?: string | null
+  locked?: boolean
+  visible_until?: string | null
 }
 
 export interface RecipeListResponse {
@@ -80,6 +82,8 @@ export interface RecipeDetailResponse {
   share_url?: string | null
   collections?: RecipeCollectionTag[]
   icon_url?: string | null
+  locked?: boolean
+  visible_until?: string | null
 }
 
 export type { RecipeCollectionTag }

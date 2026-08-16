@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -9,15 +10,20 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ingestSocialLink } from '@/api/ingest'
-import { parseRecipe } from '@/api/client'
+import { checkUpload, getBillingUsage, lookupSocialLink, parseRecipe } from '@/api/client'
+import { isBillingError } from '@/api/errors'
 import { saveReviewDraft, consumeAddFormReset } from '@/lib/reviewDraft'
 import type { IngestLinkResponse } from '@/types/ingest'
 import { videoPlatformLabel } from '@/types/ingest'
 import { VideoLinkPreview } from '@/components/VideoLinkPreview'
 import { RecipeCreateProgress } from '@/components/RecipeCreateProgress'
+import { UpgradePaywall } from '@/components/UpgradePaywall'
+import { ExistingSourcePrompt } from '@/components/ExistingSourcePrompt'
+import { useAuth } from '@/context/AuthContext'
 import { useFeatures } from '@/context/FeaturesContext'
+import { uploadsLeftLabel, videoLimitLabel } from '@/types/billing'
 import {
   colors,
   commonStyles,
@@ -33,11 +39,20 @@ type CreateResult =
       ingested: IngestLinkResponse
       rawText: string
       parsed: Awaited<ReturnType<typeof parseRecipe>>
+      allowDuplicate?: boolean
+    }
+  | {
+      status: 'cached'
+      kind: 'library' | 'generated'
+      ingested: IngestLinkResponse
+      rawText: string
     }
   | { status: 'needs_edit'; ingested: IngestLinkResponse; rawText: string; message: string }
 
 export default function NewRecipeScreen() {
   const features = useFeatures()
+  const { isAuthenticated, loading: authLoading } = useAuth()
+  const queryClient = useQueryClient()
   const [text, setText] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [manualCaption, setManualCaption] = useState('')
@@ -45,14 +60,51 @@ export default function NewRecipeScreen() {
   const [editMessage, setEditMessage] = useState<string | null>(null)
   const [progressStep, setProgressStep] = useState<number | null>(null)
   const [progressSession, setProgressSession] = useState(0)
+  const [cachedPrompt, setCachedPrompt] = useState<Extract<CreateResult, { status: 'cached' }> | null>(
+    null,
+  )
+
+  const { data: usage } = useQuery({
+    queryKey: ['billing-usage'],
+    queryFn: getBillingUsage,
+    enabled: isAuthenticated,
+  })
 
   const createRecipeMutation = useMutation({
-    mutationFn: async (): Promise<CreateResult> => {
+    mutationFn: async (opts?: { force?: boolean }): Promise<CreateResult> => {
+      const force = Boolean(opts?.force)
+      if (!force) {
+        const looked = await lookupSocialLink(linkUrl.trim())
+        if (looked.found && looked.existing_recipe_id) {
+          return {
+            status: 'cached',
+            kind: 'library',
+            ingested: looked,
+            rawText: looked.raw_text.trim(),
+          }
+        }
+        if (looked.found && looked.from_cache && looked.recipe && looked.recipe.steps.length > 0) {
+          return { status: 'cached', kind: 'generated', ingested: looked, rawText: looked.raw_text.trim() }
+        }
+      }
+      await checkUpload()
       setProgressStep(0)
       const ingested = await ingestSocialLink({
         url: linkUrl.trim(),
         caption: manualCaption.trim() || undefined,
+        force,
       })
+      if (!force && ingested.existing_recipe_id) {
+        return {
+          status: 'cached',
+          kind: 'library',
+          ingested,
+          rawText: ingested.raw_text.trim(),
+        }
+      }
+      if (ingested.video_duration) {
+        await checkUpload(ingested.video_duration)
+      }
       setProgressStep(1)
       const rawText = ingested.raw_text.trim()
       if (rawText.length < 10) {
@@ -65,13 +117,17 @@ export default function NewRecipeScreen() {
         }
       }
       setProgressStep(2)
+      if (!force && ingested.from_cache && ingested.recipe && ingested.recipe.steps.length > 0) {
+        return { status: 'cached', kind: 'generated', ingested, rawText }
+      }
       try {
         const parsed = await parseRecipe({
           raw_text: rawText,
           source_url: ingested.source_url,
           video_duration: ingested.video_duration ?? undefined,
+          force,
         })
-        return { status: 'done', ingested, rawText, parsed }
+        return { status: 'done', ingested, rawText, parsed, allowDuplicate: force }
       } catch {
         return {
           status: 'needs_edit',
@@ -83,7 +139,15 @@ export default function NewRecipeScreen() {
       }
     },
     onSuccess: async (result) => {
+      if (result.status === 'cached') {
+        setCachedPrompt(result)
+        return
+      }
+      setCachedPrompt(null)
       if (result.status === 'done') {
+        if (result.allowDuplicate) {
+          queryClient.invalidateQueries({ queryKey: ['billing-usage'] })
+        }
         await saveReviewDraft({
           rawText: result.rawText,
           recipe: result.parsed.recipe,
@@ -91,6 +155,8 @@ export default function NewRecipeScreen() {
           sourceType: result.ingested.source_type,
           sourceUrl: result.ingested.source_url,
           stepImageNotes: result.parsed.step_image_notes,
+          allowDuplicate: result.allowDuplicate,
+          usageAlreadyRecorded: result.allowDuplicate,
         })
         router.push('/review')
         return
@@ -114,6 +180,7 @@ export default function NewRecipeScreen() {
       if (rawText.length < 10) {
         throw new Error('Recipe text is too short. Add more detail or paste the caption and try again.')
       }
+      await checkUpload(extracted.video_duration)
       return parseRecipe({
         raw_text: rawText,
         source_url: extracted.source_url,
@@ -146,6 +213,7 @@ export default function NewRecipeScreen() {
     setText('')
     setEditMessage(null)
     setProgressStep(null)
+    setCachedPrompt(null)
     createRecipeMutation.reset()
     retryParseMutation.reset()
   }, [createRecipeMutation, retryParseMutation])
@@ -160,15 +228,47 @@ export default function NewRecipeScreen() {
 
   const isBusy = createRecipeMutation.isPending || retryParseMutation.isPending
   const showEditPanel = extracted !== null
-  const canSubmit = linkUrl.trim().length >= 10 && !isBusy
+  const overQuota = (usage?.uploads_remaining_today ?? 1) <= 0
+  const canSubmit = linkUrl.trim().length >= 10 && !isBusy && !overQuota
+  const billingError = [createRecipeMutation.error, retryParseMutation.error].find((err) =>
+    isBillingError(err),
+  )
+  const paywallReason = isBillingError(billingError, 'video_too_long')
+    ? 'duration'
+    : isBillingError(billingError, 'daily_upload_limit') || overQuota
+      ? 'quota'
+      : null
 
   const resetLinkFlow = () => {
     setExtracted(null)
     setText('')
     setEditMessage(null)
     setProgressStep(null)
+    setCachedPrompt(null)
     createRecipeMutation.reset()
     retryParseMutation.reset()
+  }
+
+  if (authLoading) {
+    return (
+      <View style={[commonStyles.screen, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator color={colors.brand} />
+      </View>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.screenContent}>
+        <Text style={commonStyles.pageTitle}>Add a recipe</Text>
+        <Text style={[commonStyles.pageSubtitle, { marginTop: spacing.md }]}>
+          Sign in to import recipes. Free accounts get 2 uploads a day.
+        </Text>
+        <Pressable onPress={() => router.push('/login')} style={[commonStyles.primaryBtn, { marginTop: spacing.xxl }]}>
+          <Text style={commonStyles.primaryBtnText}>Sign in</Text>
+        </Pressable>
+      </ScrollView>
+    )
   }
 
   if (!features.social_ingest) {
@@ -193,6 +293,17 @@ export default function NewRecipeScreen() {
         Paste a link to any cooking video or recipe page — we&apos;ll read it and break it into easy
         step-by-step cards.
       </Text>
+      {usage ? (
+        <Text style={[commonStyles.pageSubtitle, { marginTop: spacing.sm }]}>
+          {uploadsLeftLabel(usage)} · videos up to {videoLimitLabel(usage.max_video_seconds)}
+          {usage.is_pro ? '' : ' · Free recipes stay viewable for 14 days'}
+        </Text>
+      ) : null}
+      {paywallReason ? (
+        <View style={{ marginTop: spacing.lg }}>
+          <UpgradePaywall reason={paywallReason} usage={usage} />
+        </View>
+      ) : null}
 
       {!features.ai && (
         <View style={[commonStyles.amberBanner, { marginTop: spacing.lg }]}>
@@ -209,7 +320,7 @@ export default function NewRecipeScreen() {
             value={linkUrl}
             onChangeText={(v) => {
               setLinkUrl(v)
-              if (extracted) resetLinkFlow()
+              if (extracted || cachedPrompt) resetLinkFlow()
             }}
             placeholder="TikTok, YouTube, Instagram, or any recipe website…"
             placeholderTextColor={colors.stone400}
@@ -243,7 +354,7 @@ export default function NewRecipeScreen() {
           />
         </View>
 
-        {!showEditPanel && (
+        {!showEditPanel && !cachedPrompt && (
           <Pressable
             disabled={!canSubmit}
             onPress={() => createRecipeMutation.mutate()}
@@ -261,7 +372,39 @@ export default function NewRecipeScreen() {
           <RecipeCreateProgress key={`retry-${progressSession}`} step={progressStep} mode="parse-only" />
         )}
 
-        {linkError && (
+        {cachedPrompt && !createRecipeMutation.isPending ? (
+          <ExistingSourcePrompt
+            kind={cachedPrompt.kind}
+            title={cachedPrompt.ingested.title || cachedPrompt.ingested.recipe?.title}
+            thumbnailUrl={cachedPrompt.ingested.thumbnail_url}
+            onDismiss={resetLinkFlow}
+            onUseExisting={() => {
+              if (cachedPrompt.kind === 'library' && cachedPrompt.ingested.existing_recipe_id) {
+                router.push(`/recipes/${cachedPrompt.ingested.existing_recipe_id}`)
+                return
+              }
+              const recipe = cachedPrompt.ingested.recipe
+              if (!recipe || recipe.steps.length === 0) {
+                setExtracted(cachedPrompt.ingested)
+                setText(cachedPrompt.rawText)
+                setEditMessage('We found this video before, but need a little more text to build the steps.')
+                setCachedPrompt(null)
+                return
+              }
+              void saveReviewDraft({
+                rawText: cachedPrompt.rawText,
+                recipe,
+                usedAi: cachedPrompt.ingested.used_ai ?? true,
+                sourceType: cachedPrompt.ingested.source_type,
+                sourceUrl: cachedPrompt.ingested.source_url,
+                stepImageNotes: cachedPrompt.ingested.extraction_notes,
+              }).then(() => router.push('/review'))
+            }}
+            onGenerateNew={() => createRecipeMutation.mutate({ force: true })}
+          />
+        ) : null}
+
+        {linkError && !isBillingError(linkError) && (
           <View style={commonStyles.errorBanner}>
             <Text style={commonStyles.errorBannerText}>
               {linkError.message || 'Something went wrong. Is the backend running?'}
@@ -321,7 +464,7 @@ export default function NewRecipeScreen() {
               {Math.round(extracted.confidence * 100)}%
             </Text>
 
-            {parseError && (
+            {parseError && !isBillingError(parseError) && (
               <View style={[commonStyles.errorBanner, { marginTop: spacing.lg }]}>
                 <Text style={commonStyles.errorBannerText}>{parseError.message}</Text>
               </View>

@@ -63,11 +63,14 @@ export default function ReviewScreen() {
         used_ai: draft.usedAi,
         source_type: draft.sourceType ?? 'text',
         source_url: draft.sourceUrl,
+        allow_duplicate: draft.allowDuplicate,
+        usage_already_recorded: draft.usageAlreadyRecorded,
       })
       await clearReviewDraft()
       await markAddFormForReset()
       queryClient.setQueryData(['recipe', saved.id], saved)
       queryClient.invalidateQueries({ queryKey: ['recipes'] })
+      queryClient.invalidateQueries({ queryKey: ['billing-usage'] })
       router.replace(destination === 'cook' ? `/cook/${saved.id}` : `/recipes/${saved.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save')

@@ -1,17 +1,34 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { useFeatures } from '../context/FeaturesContext'
+import { useAuth } from '../context/AuthContext'
 import { ingestSocialLink } from '../api/ingest'
-import { parseRecipe } from '../api/client'
+import { checkUpload, lookupSocialLink, parseRecipe, getBillingUsage } from '../api/client'
+import { isBillingError } from '../api/errors'
 import { VideoLinkPreview } from '../components/VideoLinkPreview'
 import { RecipeCreateProgress } from '../components/RecipeCreateProgress'
+import { ExistingSourcePrompt } from '../components/ExistingSourcePrompt'
+import { UpgradePaywall } from '../components/UpgradePaywall'
 import type { IngestLinkResponse } from '../types/ingest'
 import { videoPlatformLabel } from '../types/ingest'
+import { uploadsLeftLabel, videoLimitLabel } from '../types/billing'
 
 type CreateResult =
-  | { status: 'done'; ingested: IngestLinkResponse; rawText: string; parsed: Awaited<ReturnType<typeof parseRecipe>> }
+  | {
+      status: 'done'
+      ingested: IngestLinkResponse
+      rawText: string
+      parsed: Awaited<ReturnType<typeof parseRecipe>>
+      allowDuplicate?: boolean
+    }
+  | {
+      status: 'cached'
+      kind: 'library' | 'generated'
+      ingested: IngestLinkResponse
+      rawText: string
+    }
   | { status: 'needs_edit'; ingested: IngestLinkResponse; rawText: string; message: string }
 
 function saveReviewAndGo(
@@ -19,6 +36,8 @@ function saveReviewAndGo(
   rawText: string,
   parsed: Awaited<ReturnType<typeof parseRecipe>>,
   ingested: IngestLinkResponse,
+  allowDuplicate = false,
+  usageAlreadyRecorded = false,
 ) {
   sessionStorage.setItem(
     'yourcookmate_review',
@@ -29,6 +48,8 @@ function saveReviewAndGo(
       sourceType: ingested.source_type,
       sourceUrl: ingested.source_url,
       extractionNotes: ingested.extraction_notes ?? [],
+      allowDuplicate,
+      usageAlreadyRecorded,
     }),
   )
   navigate('/new/review')
@@ -36,6 +57,8 @@ function saveReviewAndGo(
 
 export function UploadPage() {
   const features = useFeatures()
+  const { isAuthenticated, loading: authLoading } = useAuth()
+  const queryClient = useQueryClient()
   const [text, setText] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [manualCaption, setManualCaption] = useState('')
@@ -43,15 +66,52 @@ export function UploadPage() {
   const [editMessage, setEditMessage] = useState<string | null>(null)
   const [progressStep, setProgressStep] = useState<number | null>(null)
   const [progressSession, setProgressSession] = useState(0)
+  const [cachedPrompt, setCachedPrompt] = useState<Extract<CreateResult, { status: 'cached' }> | null>(
+    null,
+  )
   const navigate = useNavigate()
 
+  const { data: usage } = useQuery({
+    queryKey: ['billing-usage'],
+    queryFn: getBillingUsage,
+    enabled: isAuthenticated,
+  })
+
   const createRecipeMutation = useMutation({
-    mutationFn: async (): Promise<CreateResult> => {
+    mutationFn: async (opts?: { force?: boolean }): Promise<CreateResult> => {
+      const force = Boolean(opts?.force)
+      if (!force) {
+        const looked = await lookupSocialLink(linkUrl.trim())
+        if (looked.found && looked.existing_recipe_id) {
+          return {
+            status: 'cached',
+            kind: 'library',
+            ingested: looked,
+            rawText: looked.raw_text.trim(),
+          }
+        }
+        if (looked.found && looked.from_cache && looked.recipe && looked.recipe.steps.length > 0) {
+          return { status: 'cached', kind: 'generated', ingested: looked, rawText: looked.raw_text.trim() }
+        }
+      }
+      await checkUpload()
       setProgressStep(0)
       const ingested = await ingestSocialLink({
         url: linkUrl.trim(),
         caption: manualCaption.trim() || undefined,
+        force,
       })
+      if (!force && ingested.existing_recipe_id) {
+        return {
+          status: 'cached',
+          kind: 'library',
+          ingested,
+          rawText: ingested.raw_text.trim(),
+        }
+      }
+      if (ingested.video_duration) {
+        await checkUpload(ingested.video_duration)
+      }
       setProgressStep(1)
       const rawText = ingested.raw_text.trim()
       if (rawText.length < 10) {
@@ -64,13 +124,17 @@ export function UploadPage() {
         }
       }
       setProgressStep(2)
+      if (!force && ingested.from_cache && ingested.recipe && ingested.recipe.steps.length > 0) {
+        return { status: 'cached', kind: 'generated', ingested, rawText }
+      }
       try {
         const parsed = await parseRecipe({
           raw_text: rawText,
           source_url: ingested.source_url,
           video_duration: ingested.video_duration ?? undefined,
+          force,
         })
-        return { status: 'done', ingested, rawText, parsed }
+        return { status: 'done', ingested, rawText, parsed, allowDuplicate: force }
       } catch {
         return {
           status: 'needs_edit',
@@ -86,8 +150,23 @@ export function UploadPage() {
       setProgressSession((s) => s + 1)
     },
     onSuccess: (result) => {
+      if (result.status === 'cached') {
+        setCachedPrompt(result)
+        return
+      }
+      setCachedPrompt(null)
       if (result.status === 'done') {
-        saveReviewAndGo(navigate, result.rawText, result.parsed, result.ingested)
+        if (result.allowDuplicate) {
+          queryClient.invalidateQueries({ queryKey: ['billing-usage'] })
+        }
+        saveReviewAndGo(
+          navigate,
+          result.rawText,
+          result.parsed,
+          result.ingested,
+          result.allowDuplicate,
+          result.allowDuplicate,
+        )
         return
       }
       setExtracted(result.ingested)
@@ -105,6 +184,7 @@ export function UploadPage() {
       if (rawText.length < 10) {
         throw new Error('Recipe text is too short. Add more detail or paste the caption and try again.')
       }
+      await checkUpload(extracted.video_duration)
       return parseRecipe({
         raw_text: rawText,
         source_url: extracted.source_url,
@@ -123,16 +203,39 @@ export function UploadPage() {
   })
 
   const isBusy = createRecipeMutation.isPending || retryParseMutation.isPending
-  const canSubmit = linkUrl.trim().length >= 10 && !isBusy
+  const overQuota = (usage?.uploads_remaining_today ?? 1) <= 0
+  const canSubmit = linkUrl.trim().length >= 10 && !isBusy && !overQuota
   const showEditPanel = extracted !== null
+  const billingError = [createRecipeMutation.error, retryParseMutation.error].find((err) =>
+    isBillingError(err),
+  )
+  const paywallReason = isBillingError(billingError, 'video_too_long')
+    ? 'duration'
+    : isBillingError(billingError, 'daily_upload_limit') || overQuota
+      ? 'quota'
+      : null
 
   const resetLinkFlow = () => {
     setExtracted(null)
     setText('')
     setEditMessage(null)
     setProgressStep(null)
+    setCachedPrompt(null)
     createRecipeMutation.reset()
     retryParseMutation.reset()
+  }
+
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="px-4 py-16 text-center text-stone-500">Loading…</div>
+      </Layout>
+    )
+  }
+
+  if (!isAuthenticated) {
+    navigate(`/login?redirect=${encodeURIComponent('/new')}`, { replace: true })
+    return null
   }
 
   if (!features.social_ingest) {
@@ -159,6 +262,17 @@ export function UploadPage() {
           Paste a link to any cooking video or recipe page — we&apos;ll read it and break it into
           easy step-by-step cards.
         </p>
+        {usage && (
+          <p className="mt-2 text-sm text-stone-500">
+            {uploadsLeftLabel(usage)} · videos up to {videoLimitLabel(usage.max_video_seconds)}
+            {usage.is_pro ? '' : ' · Free recipes stay viewable for 14 days'}
+          </p>
+        )}
+        {paywallReason && (
+          <div className="mt-4">
+            <UpgradePaywall reason={paywallReason} usage={usage} />
+          </div>
+        )}
 
         {!features.ai && (
           <p className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -174,7 +288,7 @@ export function UploadPage() {
               value={linkUrl}
               onChange={(e) => {
                 setLinkUrl(e.target.value)
-                if (extracted) resetLinkFlow()
+                if (extracted || cachedPrompt) resetLinkFlow()
               }}
               placeholder="TikTok, YouTube, Instagram, or any recipe website…"
               className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
@@ -204,7 +318,7 @@ export function UploadPage() {
             />
           </label>
 
-          {!showEditPanel && (
+          {!showEditPanel && !cachedPrompt && (
             <button
               type="button"
               disabled={!canSubmit}
@@ -223,7 +337,41 @@ export function UploadPage() {
             <RecipeCreateProgress key={`retry-${progressSession}`} step={progressStep} mode="parse-only" />
           )}
 
-          {linkError && (
+          {cachedPrompt && !createRecipeMutation.isPending && (
+            <ExistingSourcePrompt
+              kind={cachedPrompt.kind}
+              title={cachedPrompt.ingested.title || cachedPrompt.ingested.recipe?.title}
+              thumbnailUrl={cachedPrompt.ingested.thumbnail_url}
+              onDismiss={resetLinkFlow}
+              onUseExisting={() => {
+                if (cachedPrompt.kind === 'library' && cachedPrompt.ingested.existing_recipe_id) {
+                  navigate(`/recipes/${cachedPrompt.ingested.existing_recipe_id}`)
+                  return
+                }
+                const recipe = cachedPrompt.ingested.recipe
+                if (!recipe || recipe.steps.length === 0) {
+                  setExtracted(cachedPrompt.ingested)
+                  setText(cachedPrompt.rawText)
+                  setEditMessage('We found this video before, but need a little more text to build the steps.')
+                  setCachedPrompt(null)
+                  return
+                }
+                saveReviewAndGo(
+                  navigate,
+                  cachedPrompt.rawText,
+                  {
+                    recipe,
+                    used_ai: cachedPrompt.ingested.used_ai ?? true,
+                    step_image_notes: cachedPrompt.ingested.extraction_notes ?? [],
+                  },
+                  cachedPrompt.ingested,
+                )
+              }}
+              onGenerateNew={() => createRecipeMutation.mutate({ force: true })}
+            />
+          )}
+
+          {linkError && !isBillingError(linkError) && (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
               <p>{linkError.message || 'Something went wrong. Is the backend running?'}</p>
               <p className="mt-2 text-red-600/90">
@@ -292,7 +440,7 @@ export function UploadPage() {
                 {Math.round(extracted.confidence * 100)}%
               </p>
 
-              {parseError && (
+              {parseError && !isBillingError(parseError) && (
                 <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
                   {parseError.message}
                 </div>

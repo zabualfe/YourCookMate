@@ -44,6 +44,8 @@ export interface RecipeSummary {
   used_ai: boolean
   created_at: string
   icon_url?: string | null
+  locked?: boolean
+  visible_until?: string | null
 }
 
 export interface RecipeListResponse {
@@ -61,6 +63,8 @@ export interface RecipeDetailResponse {
   recipe: ParsedRecipe
   created_at: string
   icon_url?: string | null
+  locked?: boolean
+  visible_until?: string | null
 }
 
 export interface ReviewDraft {
@@ -70,4 +74,6 @@ export interface ReviewDraft {
   sourceType?: string
   sourceUrl?: string
   stepImageNotes?: string[]
+  allowDuplicate?: boolean
+  usageAlreadyRecorded?: boolean
 }
