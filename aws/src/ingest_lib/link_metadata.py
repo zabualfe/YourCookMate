@@ -23,14 +23,15 @@ _BROWSER_HEADERS = {
 
 # Generic "chrome" maps to the newest desktop Chrome, which TikTok currently
 # answers with a 537-byte "Site Maintenance" page. Pin versions that still work.
+# Keep this list short — each miss costs a full socket timeout on a blocked IP.
 _IMPERSONATE_CANDIDATES = (
     "chrome131",
-    "chrome136",
-    "chrome124",
     "chrome131_android",
     "safari18_0_ios",
-    "safari17_2_ios",
 )
+_PAGE_TIMEOUT = 6.0
+_OEMBED_TIMEOUT = 8.0
+_page_session_cache: dict[str, tuple] = {}
 
 _META_PROP = re.compile(
     r'<meta\b(?=[^>]*\b(?:property|name)=["\']([^"\']+)["\'])(?=[^>]*\bcontent=["\']([^"\']*)["\'])[^>]*>',
@@ -72,7 +73,7 @@ def needs_redirect_resolution(url: str) -> bool:
     return False
 
 
-def resolve_public_url(url: str, *, timeout: float = 20.0) -> str:
+def resolve_public_url(url: str, *, timeout: float = 8.0) -> str:
     """Follow share/short-link redirects so yt-dlp sees a canonical reel/video URL."""
     if not needs_redirect_resolution(url):
         return url
@@ -120,7 +121,7 @@ def _tiktok_oembed(url: str) -> Optional[dict]:
         response = httpx.get(
             "https://www.tiktok.com/oembed",
             params={"url": url},
-            timeout=15,
+            timeout=_OEMBED_TIMEOUT,
             follow_redirects=True,
             headers=_BROWSER_HEADERS,
         )
@@ -184,6 +185,19 @@ def _fetch_html(url: str) -> Optional[str]:
 
 
 def _fetch_page_session(url: str):
+    cached = _page_session_cache.get(url)
+    if cached is not None:
+        return cached
+
+    result = _fetch_page_session_uncached(url)
+    if result[0]:
+        if len(_page_session_cache) >= 4:
+            _page_session_cache.clear()
+        _page_session_cache[url] = result
+    return result
+
+
+def _fetch_page_session_uncached(url: str):
     try:
         from curl_cffi import requests as cfreq
     except Exception:
@@ -193,7 +207,7 @@ def _fetch_page_session(url: str):
         for impersonate in _IMPERSONATE_CANDIDATES:
             try:
                 session = cfreq.Session(impersonate=impersonate)
-                response = session.get(url, timeout=12, allow_redirects=True)
+                response = session.get(url, timeout=_PAGE_TIMEOUT, allow_redirects=True)
                 text = response.text or ""
                 if response.status_code == 200 and len(text) > 2000 and "Site Maintenance" not in text:
                     return text, session
@@ -201,7 +215,7 @@ def _fetch_page_session(url: str):
                 continue
 
     try:
-        response = httpx.get(url, headers=_BROWSER_HEADERS, timeout=20, follow_redirects=True)
+        response = httpx.get(url, headers=_BROWSER_HEADERS, timeout=_PAGE_TIMEOUT, follow_redirects=True)
         text = response.text or ""
         if response.status_code == 200 and len(text) > 2000 and "Site Maintenance" not in text:
             return text, None

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 
 const FULL_STEPS = [
-  { label: 'Opening your link', target: 28 },
-  { label: 'Reading the recipe', target: 62 },
+  { label: 'Opening your link', target: 16 },
+  { label: 'Watching the video', target: 62 },
   { label: 'Building step-by-step cards', target: 94 },
 ] as const
 

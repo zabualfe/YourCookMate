@@ -78,6 +78,7 @@ export async function ingestSocialLink(payload: {
   url: string
   caption?: string
   force?: boolean
+  onQueued?: () => void
 }): Promise<IngestLinkResponse> {
   const { ingestSocialLink: ingestViaAws } = await import('./ingest')
   return ingestViaAws(payload)

@@ -163,6 +163,16 @@ def _ytdlp_options(
 
 
 def _extract_with_ytdlp(url: str) -> dict:
+    source_url = resolve_public_url(url)
+    source_type = classify_video_url(source_url)
+
+    # TikTok oembed is ~400ms; skip importing yt-dlp until we actually need it.
+    if source_type in {"tiktok", "instagram"}:
+        fallback = webpage_fallback_info(source_url, source_type)
+        if fallback:
+            logger.info("Using webpage/oembed metadata for %s", source_url)
+            return fallback
+
     try:
         import yt_dlp
     except ImportError as exc:
@@ -170,16 +180,6 @@ def _extract_with_ytdlp(url: str) -> dict:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Video import is not available (yt-dlp missing on server).",
         ) from exc
-
-    source_url = resolve_public_url(url)
-    source_type = classify_video_url(source_url)
-
-    # TikTok oembed is ~400ms; yt-dlp retries can stall for minutes on a blocked IP.
-    if source_type in {"tiktok", "instagram"}:
-        fallback = webpage_fallback_info(source_url, source_type)
-        if fallback:
-            logger.info("Using webpage/oembed metadata for %s", source_url)
-            return fallback
 
     last_exc: Optional[BaseException] = None
     cookie_file = _ytdlp_cookie_file()

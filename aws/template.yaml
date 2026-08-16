@@ -327,7 +327,14 @@ Resources:
       Environment:
         Variables:
           YTDLP_COOKIES_B64: !Ref YtdlpCookiesB64
+          INGEST_WORKER_FUNCTION_NAME: !Ref IngestWorkerFunction
           STAGE: !Ref Stage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt IngestWorkerFunction.Arn
       Events:
         PreviewLink:
           Type: HttpApi
@@ -406,6 +413,12 @@ Resources:
             BatchSize: 1
             FunctionResponseTypes:
               - ReportBatchItemFailures
+        KeepWarm:
+          Type: Schedule
+          Properties:
+            Schedule: rate(4 minutes)
+            Enabled: true
+            Description: Keep ingest worker warm so link import is not a cold start.
 
 Outputs:
   ApiEndpoint:

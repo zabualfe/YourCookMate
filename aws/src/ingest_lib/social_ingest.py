@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 
 import httpx
 
-from ingest_lib.bedrock_vision import analyze_frames_for_recipe, transcribe_audio_file
 from ingest_lib.config import settings
 from ingest_lib.errors import IngestError
 from ingest_lib.link_metadata import resolve_public_url, webpage_fallback_info
@@ -207,6 +206,16 @@ def _ytdlp_options(
 
 
 def _extract_with_ytdlp(url: str) -> dict:
+    source_url = resolve_public_url(url)
+    source_type = classify_video_url(source_url)
+
+    # TikTok oembed is ~400ms; skip importing yt-dlp until we actually need it.
+    if source_type in {"tiktok", "instagram"}:
+        fallback = webpage_fallback_info(source_url, source_type)
+        if fallback:
+            logger.info("Using webpage/oembed metadata for %s", source_url)
+            return fallback
+
     try:
         import yt_dlp
     except ImportError as exc:
@@ -214,16 +223,6 @@ def _extract_with_ytdlp(url: str) -> dict:
             "Video import is not available (yt-dlp missing on worker). "
             "Redeploy the AWS stack so the ingest worker includes requirements-worker.txt."
         ) from exc
-
-    source_url = resolve_public_url(url)
-    source_type = classify_video_url(source_url)
-
-    # TikTok oembed is ~400ms; yt-dlp retries can stall for minutes on a blocked IP.
-    if source_type in {"tiktok", "instagram"}:
-        fallback = webpage_fallback_info(source_url, source_type)
-        if fallback:
-            logger.info("Using webpage/oembed metadata for %s", source_url)
-            return fallback
 
     last_exc: Optional[BaseException] = None
     cookie_file = _ytdlp_cookie_file()
@@ -394,6 +393,7 @@ def _run_audio_step(
     max_audio_seconds: Optional[float] = None,
 ) -> Optional[str]:
     notes.append("Trying audio transcription (Amazon Transcribe)…")
+    from ingest_lib.bedrock_vision import transcribe_audio_file
     if video_path and video_path.is_file():
         with tempfile.TemporaryDirectory() as tmp:
             audio_path = Path(tmp) / "audio.m4a"
@@ -433,6 +433,7 @@ def _run_visual_step(
     caption: Optional[str] = None,
 ) -> Optional[str]:
     from ingest_lib.video_gemini import analyze_video_with_gemini, gemini_video_configured
+    from ingest_lib.bedrock_vision import analyze_frames_for_recipe
 
     cached = get_cached_video(source_url)
     if not cached:

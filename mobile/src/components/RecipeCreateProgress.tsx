@@ -4,8 +4,8 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { colors, fonts, radii } from '@/constants/theme'
 
 const FULL_STEPS = [
-  { label: 'Opening your link', target: 28 },
-  { label: 'Reading the recipe', target: 62 },
+  { label: 'Opening your link', target: 16 },
+  { label: 'Watching the video', target: 62 },
   { label: 'Building step-by-step cards', target: 94 },
 ] as const
 

@@ -8,7 +8,7 @@ const BUILD_TIME_AWS_BASE = (import.meta.env.VITE_AWS_API_URL as string | undefi
 /** Runtime override from /api/features (Vercel env without rebuild). */
 let runtimeAwsBase: string | undefined = BUILD_TIME_AWS_BASE
 
-const JOB_POLL_MS = 1000
+const JOB_POLL_MS = 400
 const JOB_POLL_MS_MAX = 2000
 const JOB_MAX_ATTEMPTS = 150 // ~5 minutes
 
@@ -98,8 +98,10 @@ export async function ingestSocialLink(payload: {
   url: string
   caption?: string
   force?: boolean
+  onQueued?: () => void
 }): Promise<IngestLinkResponse> {
   if (!getAwsIngestBase() || import.meta.env.DEV) {
+    payload.onQueued?.()
     const { ingestSocialLinkSync } = await import('./client')
     return ingestSocialLinkSync(payload)
   }
@@ -112,6 +114,7 @@ export async function ingestSocialLink(payload: {
       force: payload.force || undefined,
     }),
   })
+  payload.onQueued?.()
   return pollIngestJob(queued.job_id)
 }
 

@@ -14,7 +14,7 @@ function getAwsIngestBase(): string | undefined {
   return runtimeAwsBase
 }
 
-const JOB_POLL_MS = 1000
+const JOB_POLL_MS = 400
 const JOB_POLL_MS_MAX = 2000
 const JOB_MAX_ATTEMPTS = 150
 
@@ -93,8 +93,10 @@ export async function ingestSocialLink(payload: {
   url: string
   caption?: string
   force?: boolean
+  onQueued?: () => void
 }): Promise<IngestLinkResponse> {
   if (!getAwsIngestBase() || __DEV__) {
+    payload.onQueued?.()
     const { ingestSocialLinkSync } = await import('./client')
     return ingestSocialLinkSync(payload)
   }
@@ -107,6 +109,7 @@ export async function ingestSocialLink(payload: {
       force: payload.force || undefined,
     }),
   })
+  payload.onQueued?.()
   return pollIngestJob(queued.job_id)
 }
 

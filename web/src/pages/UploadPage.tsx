@@ -104,6 +104,7 @@ export function UploadPage() {
         url: linkUrl.trim(),
         caption: manualCaption.trim() || undefined,
         force,
+        onQueued: () => setProgressStep(1),
       })
       if (!force && ingested.existing_recipe_id) {
         return {
@@ -116,7 +117,6 @@ export function UploadPage() {
       if (ingested.video_duration) {
         await checkUpload(ingested.video_duration)
       }
-      setProgressStep(1)
       const rawText = ingested.raw_text.trim()
       if (rawText.length < 10) {
         return {
