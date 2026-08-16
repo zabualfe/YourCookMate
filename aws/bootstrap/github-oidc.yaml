@@ -138,6 +138,20 @@ Resources:
                 Resource: "*"
               - Effect: Allow
                 Action:
+                  - events:DescribeRule
+                  - events:PutRule
+                  - events:DeleteRule
+                  - events:EnableRule
+                  - events:DisableRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                  - events:ListTargetsByRule
+                  - events:TagResource
+                  - events:UntagResource
+                  - events:ListTagsForResource
+                Resource: "*"
+              - Effect: Allow
+                Action:
                   - sqs:CreateQueue
                   - sqs:DeleteQueue
                   - sqs:GetQueueAttributes
