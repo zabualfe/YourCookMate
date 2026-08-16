@@ -82,6 +82,24 @@ Parameters:
     Type: String
     Default: ""
     Description: Public API URL for OAuth callbacks (optional — derived from request Host when empty).
+  StripeSecretKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Live Stripe secret or restricted key (sk_live_… / rk_live_…).
+  StripeWebhookSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Live webhook signing secret (whsec_…).
+  StripePriceId:
+    Type: String
+    Default: ""
+    Description: Live Stripe Price ID for Pro (price_…).
+  StripeProPriceLabel:
+    Type: String
+    Default: ""
+    Description: Optional display label, e.g. $7.99/month.
 
 Globals:
   Function:
@@ -199,6 +217,10 @@ Resources:
           APPLE_CLIENT_ID: !Ref AppleClientId
           APPLE_IOS_CLIENT_ID: !Ref AppleIosClientId
           ADMIN_EMAILS: !Ref AdminEmails
+          STRIPE_SECRET_KEY: !Ref StripeSecretKey
+          STRIPE_WEBHOOK_SECRET: !Ref StripeWebhookSecret
+          STRIPE_PRICE_ID: !Ref StripePriceId
+          STRIPE_PRO_PRICE_LABEL: !Ref StripeProPriceLabel
           FEATURE_AUTH: "true"
           FEATURE_REGISTRATION: "true"
           FEATURE_AI: "true"

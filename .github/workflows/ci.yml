@@ -17,6 +17,10 @@ name: CI
 #   AWS_GEMINI_API_KEY — Google AI Studio key for native video vision
 #   AWS_GEMINI_VISION_MODEL — optional (default gemini-3.5-flash)
 #   AWS_SOCIAL_VISION_PROVIDER — optional (auto|gemini|frames; default auto)
+#   AWS_STRIPE_SECRET_KEY — live sk_live_… or rk_live_…
+#   AWS_STRIPE_WEBHOOK_SECRET — live whsec_… from the production webhook
+#   AWS_STRIPE_PRICE_ID — live price_… for Pro
+#   AWS_STRIPE_PRO_PRICE_LABEL — optional, e.g. $7.99/month
 #
 # Vercel project env vars:
 #   VITE_API_URL — AWS API Gateway base (auth, recipes, ingest)
@@ -174,6 +178,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.AWS_GEMINI_API_KEY }}
           GEMINI_VISION_MODEL: ${{ secrets.AWS_GEMINI_VISION_MODEL }}
           SOCIAL_VISION_PROVIDER: ${{ secrets.AWS_SOCIAL_VISION_PROVIDER }}
+          STRIPE_SECRET_KEY: ${{ secrets.AWS_STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.AWS_STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ID: ${{ secrets.AWS_STRIPE_PRICE_ID }}
+          STRIPE_PRO_PRICE_LABEL: ${{ secrets.AWS_STRIPE_PRO_PRICE_LABEL }}
         run: |
           overrides=( "Stage=prod" )
           if [[ -n "${FRONTEND_URL:-}" ]]; then
@@ -230,6 +238,18 @@ jobs:
             overrides+=( "SocialVisionProvider=${SOCIAL_VISION_PROVIDER}" )
           else
             overrides+=( "SocialVisionProvider=auto" )
+          fi
+          if [[ -n "${STRIPE_SECRET_KEY:-}" ]]; then
+            overrides+=( "StripeSecretKey=${STRIPE_SECRET_KEY}" )
+          fi
+          if [[ -n "${STRIPE_WEBHOOK_SECRET:-}" ]]; then
+            overrides+=( "StripeWebhookSecret=${STRIPE_WEBHOOK_SECRET}" )
+          fi
+          if [[ -n "${STRIPE_PRICE_ID:-}" ]]; then
+            overrides+=( "StripePriceId=${STRIPE_PRICE_ID}" )
+          fi
+          if [[ -n "${STRIPE_PRO_PRICE_LABEL:-}" ]]; then
+            overrides+=( "StripeProPriceLabel=${STRIPE_PRO_PRICE_LABEL}" )
           fi
           echo "Deploying AWS stack (Stage, ApiFunction, ingest workers…)"
           sam deploy --no-fail-on-empty-changeset --parameter-overrides "${overrides[@]}"

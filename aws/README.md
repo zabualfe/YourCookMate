@@ -154,6 +154,10 @@ All API calls → API Gateway
 | `AWS_GOOGLE_CLIENT_ID`, `AWS_GOOGLE_CLIENT_SECRET`, `AWS_GOOGLE_IOS_CLIENT_ID` | Google OAuth |
 | `AWS_APPLE_CLIENT_ID`, `AWS_APPLE_IOS_CLIENT_ID` | Apple Sign In (optional) |
 | `AWS_YTDLP_COOKIES_B64` | Run `./aws/bootstrap/encode-cookies.sh` on `backend/cookies.social.txt` |
+| `AWS_STRIPE_SECRET_KEY` | Live `sk_live_…` or restricted `rk_live_…` |
+| `AWS_STRIPE_WEBHOOK_SECRET` | Live `whsec_…` from Workbench → Webhooks |
+| `AWS_STRIPE_PRICE_ID` | Live Pro `price_…` |
+| `AWS_STRIPE_PRO_PRICE_LABEL` | Optional, e.g. `$7.99/month` |
 
 Get AWS URL after deploy:
 
@@ -163,6 +167,12 @@ aws cloudformation describe-stacks --stack-name yourcookmate \
 ```
 
 Set that URL as `VITE_API_URL` on Vercel. `GET /health` should return `"runtime": "lambda"`.
+
+Live Stripe webhook URL (after keys are in GitHub secrets):
+
+```text
+https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/prod/billing/webhook
+```
 
 ## Test the deployed API
 

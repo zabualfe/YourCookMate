@@ -122,6 +122,10 @@ https://{api-id}.execute-api.us-east-1.amazonaws.com/prod
 | `AWS_GOOGLE_*`, `AWS_APPLE_*` | OAuth |
 | `AWS_YTDLP_COOKIES_B64` | Instagram import cookies |
 | `AWS_GEMINI_API_KEY` | Google AI Studio key (native video vision on ingest worker) |
+| `AWS_STRIPE_SECRET_KEY` | Live Stripe secret or restricted key |
+| `AWS_STRIPE_WEBHOOK_SECRET` | Live webhook signing secret |
+| `AWS_STRIPE_PRICE_ID` | Live Pro price ID (`price_…`) |
+| `AWS_STRIPE_PRO_PRICE_LABEL` | Optional display label, e.g. `$7.99/month` |
 | `AWS_GEMINI_VISION_MODEL` | Optional — default `gemini-3.5-flash` |
 | `AWS_SOCIAL_VISION_PROVIDER` | Optional — `auto` (default), `gemini`, or `frames` |
 
