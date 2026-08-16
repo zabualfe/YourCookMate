@@ -189,7 +189,10 @@ def _ytdlp_options(
         "no_warnings": True,
         "skip_download": True,
         "noplaylist": True,
-        "socket_timeout": 45,
+        "socket_timeout": 12,
+        "retries": 0,
+        "fragment_retries": 0,
+        "extractor_retries": 0,
         **extra,
     }
     if use_cookies:
@@ -213,26 +216,29 @@ def _extract_with_ytdlp(url: str) -> dict:
         ) from exc
 
     source_url = resolve_public_url(url)
+    source_type = classify_video_url(source_url)
+
+    # TikTok oembed is ~400ms; yt-dlp retries can stall for minutes on a blocked IP.
+    if source_type in {"tiktok", "instagram"}:
+        fallback = webpage_fallback_info(source_url, source_type)
+        if fallback:
+            logger.info("Using webpage/oembed metadata for %s", source_url)
+            return fallback
+
     last_exc: Optional[BaseException] = None
     cookie_file = _ytdlp_cookie_file()
-    attempts: list[dict[str, bool]] = []
-    if cookie_file:
-        attempts.append({"use_cookies": True, "use_impersonate": True})
-    attempts.append({"use_cookies": False, "use_impersonate": True})
-    if cookie_file:
-        attempts.append({"use_cookies": True, "use_impersonate": False})
+    try:
+        with yt_dlp.YoutubeDL(
+            _ytdlp_options(use_cookies=bool(cookie_file), use_impersonate=True)
+        ) as ydl:
+            return ydl.extract_info(source_url, download=False)
+    except IngestError:
+        raise
+    except Exception as exc:
+        last_exc = exc
+        logger.warning("yt-dlp extract failed for %s: %s", source_url, exc)
 
-    for attempt in attempts:
-        try:
-            with yt_dlp.YoutubeDL(_ytdlp_options(**attempt)) as ydl:
-                return ydl.extract_info(source_url, download=False)
-        except IngestError:
-            raise
-        except Exception as exc:
-            last_exc = exc
-            logger.warning("yt-dlp extract failed (%s) for %s: %s", attempt, source_url, exc)
-
-    fallback = webpage_fallback_info(source_url, classify_video_url(source_url))
+    fallback = webpage_fallback_info(source_url, source_type)
     if fallback:
         logger.info("Using webpage/oembed metadata for %s", source_url)
         return fallback
@@ -434,7 +440,6 @@ def _run_visual_step(
             source_url,
             _ytdlp_options,
             duration=duration,
-            frame_count=_ingest_frame_count(),
         )
         cached = get_cached_video(source_url)
 
@@ -548,7 +553,6 @@ def ingest_social_link(url: str, manual_caption: Optional[str] = None) -> dict:
             source_url,
             _ytdlp_options,
             duration=duration,
-            frame_count=_ingest_frame_count(),
         )
 
     cached_video = get_cached_video(source_url)

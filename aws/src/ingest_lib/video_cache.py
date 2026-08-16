@@ -7,7 +7,6 @@ import tempfile
 from pathlib import Path
 from typing import Callable, Optional
 
-from ingest_lib.config import settings
 from ingest_lib.video_frames import download_video, extract_evenly_spaced_frames
 
 _VIDEO_SUFFIXES = {".mp4", ".webm", ".mkv", ".mov"}
@@ -64,7 +63,15 @@ def ensure_video_cached(
             video_path = cache_dir / f"video{downloaded.suffix.lower()}"
             shutil.copy2(downloaded, video_path)
 
-    target_frames = frame_count or settings.social_step_max_frames
+    if not frame_count:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        (cache_dir / _META_FILE).write_text(
+            json.dumps({"duration": duration, "frame_count": 0}),
+            encoding="utf-8",
+        )
+        return video_path
+
+    target_frames = frame_count
     existing_frames = get_cached_frames(source_url)
     if len(existing_frames) < target_frames:
         frames_dir = cache_dir / _FRAMES_DIR

@@ -18,6 +18,12 @@ def ffmpeg_executable() -> Optional[str]:
 
 
 def download_video(url: str, tmp_dir: Path, ytdlp_options: Callable[..., dict]) -> Optional[Path]:
+    from ingest_lib.link_metadata import download_direct_mp4, prefers_direct_download
+
+    dest = tmp_dir / "clip.mp4"
+    if prefers_direct_download(url) and download_direct_mp4(url, dest):
+        return dest
+
     try:
         import yt_dlp
     except ImportError:
@@ -27,9 +33,13 @@ def download_video(url: str, tmp_dir: Path, ytdlp_options: Callable[..., dict]) 
         out_path = str(tmp_dir / "clip.%(ext)s")
         opts = ytdlp_options(
             skip_download=False,
-            format="best[height<=720][filesize<25M]/best[height<=720]/best",
+            format="best[height<=480][ext=mp4]/best[height<=480]/best[height<=720]/best",
             outtmpl=out_path,
             postprocessors=[],
+            retries=0,
+            fragment_retries=0,
+            extractor_retries=0,
+            socket_timeout=12,
         )
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -45,9 +55,8 @@ def download_video(url: str, tmp_dir: Path, ytdlp_options: Callable[..., dict]) 
         if videos:
             return videos[0]
 
-    from ingest_lib.link_metadata import download_direct_mp4
-
-    dest = tmp_dir / "clip.mp4"
+    if dest.is_file() and dest.stat().st_size > 64:
+        return dest
     if download_direct_mp4(url, dest):
         return dest
     return None

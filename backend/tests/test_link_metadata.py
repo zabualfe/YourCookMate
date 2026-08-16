@@ -2,6 +2,7 @@ from app.services.link_metadata import (
     extract_direct_video_urls,
     needs_redirect_resolution,
     parse_open_graph,
+    prefers_direct_download,
 )
 
 
@@ -42,4 +43,10 @@ def test_extract_direct_video_urls_prefers_download_addr():
     urls = extract_direct_video_urls(page)
     assert urls[0] == "https://cdn.example/dl/clip.mp4"
     assert "https://cdn.example/play/clip.mp4" in urls
+
+
+def test_prefers_direct_download_for_short_form():
+    assert prefers_direct_download("https://www.tiktok.com/@chef/video/1")
+    assert prefers_direct_download("https://www.instagram.com/reel/AbC/")
+    assert not prefers_direct_download("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 

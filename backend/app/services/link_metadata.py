@@ -49,6 +49,16 @@ _VIDEO_URL_PATTERNS = (
 )
 
 
+def prefers_direct_download(url: str) -> bool:
+    """TikTok/Instagram: page JSON + TLS impersonation is much faster than yt-dlp."""
+    host = urlparse(url if "://" in url else f"https://{url}").netloc.lower().removeprefix("www.")
+    return (
+        host.endswith("tiktok.com")
+        or host in {"instagram.com", "instagr.am", "l.instagram.com"}
+        or "instagram.com" in host
+    )
+
+
 def needs_redirect_resolution(url: str) -> bool:
     parsed = urlparse(url if "://" in url else f"https://{url}")
     host = parsed.netloc.lower().removeprefix("www.")
@@ -183,7 +193,7 @@ def _fetch_page_session(url: str):
         for impersonate in _IMPERSONATE_CANDIDATES:
             try:
                 session = cfreq.Session(impersonate=impersonate)
-                response = session.get(url, timeout=25, allow_redirects=True)
+                response = session.get(url, timeout=12, allow_redirects=True)
                 text = response.text or ""
                 if response.status_code == 200 and len(text) > 2000 and "Site Maintenance" not in text:
                     return text, session
@@ -200,6 +210,17 @@ def _fetch_page_session(url: str):
     return None, None
 
 
+_MAX_DIRECT_BYTES = 20 * 1024 * 1024
+
+
+def _write_limited(response, dest: Path) -> bool:
+    payload = response.content or b""
+    if not _is_mp4(payload):
+        return False
+    dest.write_bytes(payload[:_MAX_DIRECT_BYTES])
+    return dest.is_file() and dest.stat().st_size > 64
+
+
 def download_direct_mp4(page_url: str, dest: Path) -> bool:
     """Download the mp4 from page JSON when yt-dlp cannot (TikTok TLS blocks)."""
     page_html, session = _fetch_page_session(page_url)
@@ -210,23 +231,21 @@ def download_direct_mp4(page_url: str, dest: Path) -> bool:
         return False
 
     headers = {**_BROWSER_HEADERS, "Referer": "https://www.tiktok.com/"}
-    for media_url in urls:
+    for media_url in urls[:2]:
         try:
             if session is not None:
-                response = session.get(media_url, timeout=60, headers=headers, allow_redirects=True)
-                payload = response.content or b""
+                response = session.get(media_url, timeout=45, headers=headers, allow_redirects=True)
                 status = response.status_code
+                ok = status < 400 and _write_limited(response, dest)
             else:
-                response = httpx.get(media_url, timeout=60, headers=headers, follow_redirects=True)
-                payload = response.content or b""
+                response = httpx.get(media_url, timeout=45, headers=headers, follow_redirects=True)
                 status = response.status_code
+                ok = status < 400 and _write_limited(response, dest)
         except Exception as exc:
             logger.info("Direct video download failed: %s", exc)
             continue
-        if status >= 400 or not _is_mp4(payload):
-            continue
-        dest.write_bytes(payload)
-        return dest.is_file() and dest.stat().st_size > 64
+        if ok:
+            return True
     return False
 
 
