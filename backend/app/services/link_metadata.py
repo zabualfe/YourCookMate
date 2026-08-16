@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 import re
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -19,6 +21,17 @@ _BROWSER_HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+# Generic "chrome" maps to the newest desktop Chrome, which TikTok currently
+# answers with a 537-byte "Site Maintenance" page. Pin versions that still work.
+_IMPERSONATE_CANDIDATES = (
+    "chrome131",
+    "chrome136",
+    "chrome124",
+    "chrome131_android",
+    "safari18_0_ios",
+    "safari17_2_ios",
+)
+
 _META_PROP = re.compile(
     r'<meta\b(?=[^>]*\b(?:property|name)=["\']([^"\']+)["\'])(?=[^>]*\bcontent=["\']([^"\']*)["\'])[^>]*>',
     re.I,
@@ -26,6 +39,13 @@ _META_PROP = re.compile(
 _META_PROP_REV = re.compile(
     r'<meta\b(?=[^>]*\bcontent=["\']([^"\']*)["\'])(?=[^>]*\b(?:property|name)=["\']([^"\']+)["\'])[^>]*>',
     re.I,
+)
+_VIDEO_URL_PATTERNS = (
+    re.compile(r'"downloadAddr"\s*:\s*"([^"]+)"'),
+    re.compile(r'"playAddr"\s*:\s*"([^"]+)"'),
+    re.compile(r'"video_url"\s*:\s*"([^"]+)"'),
+    re.compile(r'"play_url"\s*:\s*"([^"]+)"'),
+    re.compile(r'"url_list"\s*:\s*\[\s*"([^"]+)"'),
 )
 
 
@@ -117,22 +137,97 @@ def _tiktok_oembed(url: str) -> Optional[dict]:
     }
 
 
+def _json_unescape(value: str) -> str:
+    try:
+        return json.loads(f'"{value}"')
+    except Exception:
+        return (
+            bytes(value, "utf-8")
+            .decode("unicode_escape")
+            .replace("\\/", "/")
+            .replace("\\u0026", "&")
+        )
+
+
+def extract_direct_video_urls(page_html: str) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    for pattern in _VIDEO_URL_PATTERNS:
+        for match in pattern.finditer(page_html):
+            raw = html.unescape(_json_unescape(match.group(1))).strip()
+            if not raw.startswith("http"):
+                continue
+            if raw in seen:
+                continue
+            seen.add(raw)
+            found.append(raw)
+    return found
+
+
+def _is_mp4(payload: bytes) -> bool:
+    return len(payload) > 64 and (payload[4:8] == b"ftyp" or payload.startswith(b"\x00\x00\x00"))
+
+
 def _fetch_html(url: str) -> Optional[str]:
+    html_text, _session = _fetch_page_session(url)
+    return html_text
+
+
+def _fetch_page_session(url: str):
     try:
         from curl_cffi import requests as cfreq
-
-        response = cfreq.get(url, impersonate="chrome", timeout=20, allow_redirects=True)
-        if response.status_code == 200 and len(response.text or "") > 400:
-            return response.text
     except Exception:
-        pass
+        cfreq = None
+
+    if cfreq is not None:
+        for impersonate in _IMPERSONATE_CANDIDATES:
+            try:
+                session = cfreq.Session(impersonate=impersonate)
+                response = session.get(url, timeout=25, allow_redirects=True)
+                text = response.text or ""
+                if response.status_code == 200 and len(text) > 2000 and "Site Maintenance" not in text:
+                    return text, session
+            except Exception:
+                continue
+
     try:
         response = httpx.get(url, headers=_BROWSER_HEADERS, timeout=20, follow_redirects=True)
-        if response.status_code == 200 and len(response.text or "") > 400:
-            return response.text
+        text = response.text or ""
+        if response.status_code == 200 and len(text) > 2000 and "Site Maintenance" not in text:
+            return text, None
     except Exception:
-        return None
-    return None
+        return None, None
+    return None, None
+
+
+def download_direct_mp4(page_url: str, dest: Path) -> bool:
+    """Download the mp4 from page JSON when yt-dlp cannot (TikTok TLS blocks)."""
+    page_html, session = _fetch_page_session(page_url)
+    if not page_html:
+        return False
+    urls = extract_direct_video_urls(page_html)
+    if not urls:
+        return False
+
+    headers = {**_BROWSER_HEADERS, "Referer": "https://www.tiktok.com/"}
+    for media_url in urls:
+        try:
+            if session is not None:
+                response = session.get(media_url, timeout=60, headers=headers, allow_redirects=True)
+                payload = response.content or b""
+                status = response.status_code
+            else:
+                response = httpx.get(media_url, timeout=60, headers=headers, follow_redirects=True)
+                payload = response.content or b""
+                status = response.status_code
+        except Exception as exc:
+            logger.info("Direct video download failed: %s", exc)
+            continue
+        if status >= 400 or not _is_mp4(payload):
+            continue
+        dest.write_bytes(payload)
+        return dest.is_file() and dest.stat().st_size > 64
+    return False
 
 
 def webpage_fallback_info(url: str, source_type: str) -> Optional[dict]:
@@ -146,7 +241,6 @@ def webpage_fallback_info(url: str, source_type: str) -> Optional[dict]:
         return None
     parsed = parse_open_graph(page, url)
     if parsed and source_type == "instagram":
-        # Login walls still have generic OG tags — skip those.
         title = (parsed.get("title") or "").lower()
         if "login" in title or title in {"instagram", "instagram • photos and videos"}:
             if not parsed.get("description"):

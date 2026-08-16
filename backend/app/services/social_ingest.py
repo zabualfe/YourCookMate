@@ -87,8 +87,12 @@ def _ytdlp_impersonate():
     except Exception:
         available = []
     preferred = (
-        ImpersonateTarget("chrome", None, "macos", None),
+        ImpersonateTarget("chrome", "131", None, None),
+        ImpersonateTarget("chrome", "124", None, None),
+        ImpersonateTarget("chrome", "136", None, None),
         ImpersonateTarget("chrome", None, "windows", None),
+        ImpersonateTarget("safari", None, "ios", None),
+        ImpersonateTarget("chrome", None, "macos", None),
         ImpersonateTarget("chrome", None, None, None),
         ImpersonateTarget("safari", None, "macos", None),
     )

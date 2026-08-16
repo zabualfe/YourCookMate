@@ -1,4 +1,8 @@
-from app.services.link_metadata import needs_redirect_resolution, parse_open_graph
+from app.services.link_metadata import (
+    extract_direct_video_urls,
+    needs_redirect_resolution,
+    parse_open_graph,
+)
 
 
 def test_instagram_share_and_tiktok_short_need_resolution():
@@ -29,3 +33,13 @@ def test_parse_open_graph_content_before_property():
     info = parse_open_graph(page, "https://tiktok.com/@x/video/1")
     assert info is not None
     assert info["title"] == "Lemon chicken"
+
+
+def test_extract_direct_video_urls_prefers_download_addr():
+    page = r'''
+    {"playAddr":"https://cdn.example/play\u002Fclip.mp4","downloadAddr":"https://cdn.example/dl\u002Fclip.mp4"}
+    '''
+    urls = extract_direct_video_urls(page)
+    assert urls[0] == "https://cdn.example/dl/clip.mp4"
+    assert "https://cdn.example/play/clip.mp4" in urls
+

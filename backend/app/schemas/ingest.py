@@ -30,7 +30,7 @@ class IngestLinkResponse(BaseModel):
     thumbnail_url: Optional[str] = None
     video_duration: Optional[float] = None
     extraction_notes: list[str] = Field(default_factory=list)
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     from_cache: bool = False
     existing_recipe_id: Optional[str] = None
     used_ai: Optional[bool] = None

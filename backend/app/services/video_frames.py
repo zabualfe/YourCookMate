@@ -40,29 +40,36 @@ def download_video(url: str, tmp_dir: Path, ytdlp_options: Callable[..., dict]) 
     try:
         import yt_dlp
     except ImportError:
-        return None
+        yt_dlp = None
 
-    out_path = str(tmp_dir / "clip.%(ext)s")
-    opts = ytdlp_options(
-        skip_download=False,
-        format="best[height<=720][filesize<25M]/best[height<=720]/best",
-        outtmpl=out_path,
-        postprocessors=[],
-    )
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
-    except Exception:
-        return None
+    if yt_dlp is not None:
+        out_path = str(tmp_dir / "clip.%(ext)s")
+        opts = ytdlp_options(
+            skip_download=False,
+            format="best[height<=720][filesize<25M]/best[height<=720]/best",
+            outtmpl=out_path,
+            postprocessors=[],
+        )
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([url])
+        except Exception:
+            pass
 
-    videos = [
-        path
-        for path in tmp_dir.glob("clip.*")
-        if path.suffix.lower() in {".mp4", ".webm", ".mkv", ".mov"} and path.stat().st_size > 0
-    ]
-    if not videos:
-        return None
-    return videos[0]
+        videos = [
+            path
+            for path in tmp_dir.glob("clip.*")
+            if path.suffix.lower() in {".mp4", ".webm", ".mkv", ".mov"} and path.stat().st_size > 0
+        ]
+        if videos:
+            return videos[0]
+
+    from app.services.link_metadata import download_direct_mp4
+
+    dest = tmp_dir / "clip.mp4"
+    if download_direct_mp4(url, dest):
+        return dest
+    return None
 
 
 def sample_times_across_duration(duration: float, count: int) -> list[float]:
