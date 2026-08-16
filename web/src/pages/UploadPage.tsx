@@ -78,7 +78,7 @@ export function UploadPage() {
   })
 
   const createRecipeMutation = useMutation({
-    mutationFn: async (opts?: { force?: boolean }): Promise<CreateResult> => {
+    mutationFn: async (opts: { force?: boolean } = {}): Promise<CreateResult> => {
       const force = Boolean(opts?.force)
       if (!force) {
         const looked = await lookupSocialLink(linkUrl.trim())
@@ -322,7 +322,7 @@ export function UploadPage() {
             <button
               type="button"
               disabled={!canSubmit}
-              onClick={() => createRecipeMutation.mutate()}
+              onClick={() => createRecipeMutation.mutate({})}
               className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-brand-600 text-base font-semibold text-white transition enabled:hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-10"
             >
               Create step-by-step recipe

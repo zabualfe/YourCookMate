@@ -71,7 +71,7 @@ export default function NewRecipeScreen() {
   })
 
   const createRecipeMutation = useMutation({
-    mutationFn: async (opts?: { force?: boolean }): Promise<CreateResult> => {
+    mutationFn: async (opts: { force?: boolean } = {}): Promise<CreateResult> => {
       const force = Boolean(opts?.force)
       if (!force) {
         const looked = await lookupSocialLink(linkUrl.trim())
@@ -357,7 +357,7 @@ export default function NewRecipeScreen() {
         {!showEditPanel && !cachedPrompt && (
           <Pressable
             disabled={!canSubmit}
-            onPress={() => createRecipeMutation.mutate()}
+            onPress={() => createRecipeMutation.mutate({})}
             style={[commonStyles.primaryBtn, disabledStyle(!canSubmit)]}
           >
             <Text style={commonStyles.primaryBtnText}>Create step-by-step recipe</Text>
