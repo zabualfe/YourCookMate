@@ -48,8 +48,8 @@ def _migrate_schema() -> None:
         return
 
     user_cols = {c["name"] for c in insp.get_columns("users")}
-    if "email_verified" not in user_cols:
-        with engine.begin() as conn:
+    with engine.begin() as conn:
+        if "email_verified" not in user_cols:
             if settings.uses_sqlite:
                 conn.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 0"))
                 conn.execute(text("UPDATE users SET email_verified = 1"))
@@ -58,6 +58,27 @@ def _migrate_schema() -> None:
                     text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE")
                 )
                 conn.execute(text("UPDATE users SET email_verified = TRUE"))
+        if "stripe_customer_id" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255)"))
+        if "stripe_subscription_id" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(255)"))
+        if "plan" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN plan VARCHAR(32) NOT NULL DEFAULT 'free'"))
+        if "subscription_status" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN subscription_status VARCHAR(32)"))
+        if "subscription_current_period_end" not in user_cols:
+            conn.execute(
+                text("ALTER TABLE users ADD COLUMN subscription_current_period_end TIMESTAMP WITH TIME ZONE")
+            )
+        if "cancel_at_period_end" not in user_cols:
+            if settings.uses_sqlite:
+                conn.execute(
+                    text("ALTER TABLE users ADD COLUMN cancel_at_period_end BOOLEAN NOT NULL DEFAULT 0")
+                )
+            else:
+                conn.execute(
+                    text("ALTER TABLE users ADD COLUMN cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE")
+                )
 
     if "recipes" in insp.get_table_names():
         recipe_cols = {c["name"] for c in insp.get_columns("recipes")}
@@ -125,21 +146,6 @@ def _backfill_source_keys() -> None:
             db.commit()
     finally:
         db.close()
-
-    user_cols = {c["name"] for c in insp.get_columns("users")}
-    with engine.begin() as conn:
-        if "stripe_customer_id" not in user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255)"))
-        if "stripe_subscription_id" not in user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(255)"))
-        if "plan" not in user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN plan VARCHAR(32) NOT NULL DEFAULT 'free'"))
-        if "subscription_status" not in user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN subscription_status VARCHAR(32)"))
-        if "subscription_current_period_end" not in user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN subscription_current_period_end TIMESTAMP WITH TIME ZONE"))
-        if "cancel_at_period_end" not in user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE"))
 
 
 def init_db() -> None:

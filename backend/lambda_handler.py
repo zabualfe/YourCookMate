@@ -38,7 +38,18 @@ _asgi = Mangum(
 )
 
 
+def _is_options(event: dict) -> bool:
+    method = (
+        (event.get("requestContext") or {}).get("http", {}).get("method")
+        or event.get("httpMethod")
+        or ""
+    )
+    return str(method).upper() == "OPTIONS"
+
+
 def handler(event, context):
-    _ensure_initialized()
+    # CORS preflight must not depend on DB migrations.
+    if not _is_options(event):
+        _ensure_initialized()
     _apply_request_base_url(event)
     return _asgi(event, context)
