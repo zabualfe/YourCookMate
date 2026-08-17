@@ -66,6 +66,11 @@ export default function ProfileScreen() {
           <Text style={styles.displayName} numberOfLines={1}>
             {user.display_name ?? user.email.split('@')[0]}
           </Text>
+          {user.username ? (
+            <Text style={styles.email} numberOfLines={1}>
+              @{user.username}
+            </Text>
+          ) : null}
           <Text style={styles.email} numberOfLines={1}>
             {user.email}
           </Text>

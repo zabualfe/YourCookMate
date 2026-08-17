@@ -24,6 +24,10 @@ export function isBillingError(error: unknown, code?: BillingErrorCode): error i
   )
 }
 
+export function isUsernameRequiredError(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.code === 'username_required'
+}
+
 export function isSocialFetchError(error: unknown): boolean {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
   return (

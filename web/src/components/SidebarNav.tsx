@@ -106,7 +106,7 @@ export function SidebarNav() {
           {features.community && (
             <NavLink to="/community" className={navClass}>
               <UsersIcon />
-              Community Recipes
+              Community
             </NavLink>
           )}
         </nav>

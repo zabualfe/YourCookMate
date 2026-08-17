@@ -15,14 +15,38 @@ import type {
 
 const BASE = import.meta.env.VITE_API_URL ?? '/api'
 const TOKEN_KEY = 'yourcookmate_token'
+const USER_KEY = 'yourcookmate_user'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
 
+export function getCachedUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    const user = parsed as User
+    if (typeof user.id !== 'string' || typeof user.email !== 'string') return null
+    return user
+  } catch {
+    return null
+  }
+}
+
+export function setCachedUser(user: User | null) {
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user))
+  else localStorage.removeItem(USER_KEY)
+}
+
 export function setToken(token: string | null) {
-  if (token) localStorage.setItem(TOKEN_KEY, token)
-  else localStorage.removeItem(TOKEN_KEY)
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token)
+    return
+  }
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -116,10 +140,20 @@ export async function fetchLinkPreviewSync(payload: {
   })
 }
 
-export async function register(email: string, password: string, displayName?: string): Promise<AuthResponse> {
+export async function register(
+  email: string,
+  password: string,
+  displayName?: string,
+  username?: string,
+): Promise<AuthResponse> {
   return request('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, display_name: displayName }),
+    body: JSON.stringify({
+      email,
+      password,
+      display_name: displayName,
+      username: username || undefined,
+    }),
   })
 }
 
@@ -152,6 +186,16 @@ export async function loginWithApple(
 
 export async function fetchMe(): Promise<User> {
   return request('/auth/me')
+}
+
+export async function updateProfile(body: {
+  display_name?: string | null
+  username?: string
+}): Promise<User> {
+  return request('/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
 }
 
 export async function getBillingPlans(): Promise<BillingPlansResponse> {
@@ -361,13 +405,53 @@ export async function updateRecipeCommunity(
   })
 }
 
+export async function updateRecipePin(
+  id: string,
+  enabled: boolean,
+): Promise<RecipeDetailResponse> {
+  return request(`/recipes/${id}/pin`, {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
 export async function getSharedRecipe(slug: string): Promise<SharedRecipeResponse> {
   return request(`/r/${encodeURIComponent(slug)}`)
 }
 
-export async function listCommunityRecipes(q?: string): Promise<CommunityRecipeListResponse> {
-  const params = q ? `?q=${encodeURIComponent(q)}` : ''
-  return request(`/community/recipes${params}`)
+export async function listCommunityRecipes(
+  q?: string,
+  feed: import('../types/social').CommunityFeed = 'discover',
+): Promise<CommunityRecipeListResponse> {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (feed && feed !== 'discover') params.set('feed', feed)
+  const query = params.toString()
+  return request(`/community/recipes${query ? `?${query}` : ''}`)
+}
+
+export async function checkUsername(username: string): Promise<import('../types/social').UsernameCheckResponse> {
+  return request(`/users/check-username?username=${encodeURIComponent(username)}`)
+}
+
+export async function getPublicProfile(username: string): Promise<import('../types/social').PublicProfile> {
+  return request(`/users/${encodeURIComponent(username)}`)
+}
+
+export async function followUser(username: string): Promise<import('../types/social').FollowResponse> {
+  return request(`/users/${encodeURIComponent(username)}/follow`, { method: 'POST' })
+}
+
+export async function unfollowUser(username: string): Promise<import('../types/social').FollowResponse> {
+  return request(`/users/${encodeURIComponent(username)}/follow`, { method: 'DELETE' })
+}
+
+export async function listFollowers(username: string): Promise<import('../types/social').PublicUserListResponse> {
+  return request(`/users/${encodeURIComponent(username)}/followers`)
+}
+
+export async function listFollowing(username: string): Promise<import('../types/social').PublicUserListResponse> {
+  return request(`/users/${encodeURIComponent(username)}/following`)
 }
 
 export async function saveSharedRecipe(slug: string): Promise<RecipeDetailResponse> {

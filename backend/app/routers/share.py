@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.database import get_db
-from app.deps import get_current_user, require_verified_email
+from app.deps import get_current_user, get_optional_user, require_verified_email
 from app.models.recipe import Recipe
 from app.models.user import User
 from app.schemas.recipe import ParsedRecipe
@@ -15,14 +15,10 @@ from app.schemas.shop import InstacartLinkResponse
 from app.services.instacart import get_or_create_instacart_link
 from app.services.recipe_icons import icon_public_url
 from app.services.billing import recipe_is_locked
+from app.services.follows import is_following
+from app.services.profiles import author_name
 
 router = APIRouter(prefix="/r", tags=["share"])
-
-
-def _author_name(user: User) -> str:
-    if user.display_name:
-        return user.display_name
-    return user.email.split("@")[0]
 
 
 def _get_shared_recipe(db: Session, slug: str) -> Recipe:
@@ -44,7 +40,11 @@ def _get_shared_recipe(db: Session, slug: str) -> Recipe:
 
 
 @router.get("/{slug}", response_model=SharedRecipeResponse)
-def get_shared_recipe(slug: str, db: Session = Depends(get_db)) -> SharedRecipeResponse:
+def get_shared_recipe(
+    slug: str,
+    db: Session = Depends(get_db),
+    viewer: User | None = Depends(get_optional_user),
+) -> SharedRecipeResponse:
     from app.services.recipe_icons import enrich_recipe_step_urls
 
     row = _get_shared_recipe(db, slug)
@@ -54,7 +54,11 @@ def get_shared_recipe(slug: str, db: Session = Depends(get_db)) -> SharedRecipeR
         slug=slug,
         title=row.title,
         recipe=parsed,
-        author_name=_author_name(row.user),
+        author_name=author_name(row.user),
+        author_username=row.user.username,
+        author_avatar_url=row.user.avatar_url,
+        is_following=bool(viewer and is_following(db, viewer.id, row.user_id)),
+        is_self=bool(viewer and viewer.id == row.user_id),
         step_count=len(parsed.steps),
         used_ai=row.used_ai,
         source_type=row.source_type,

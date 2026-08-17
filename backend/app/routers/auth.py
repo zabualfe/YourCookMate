@@ -15,6 +15,7 @@ from app.schemas.auth import (
     MessageResponse,
     OAuthTokenRequest,
     RegisterRequest,
+    UpdateProfileRequest,
     UserResponse,
     VerifyEmailRequest,
 )
@@ -31,6 +32,7 @@ from app.services.email import send_verification_email
 from app.services.oauth_apple import AppleAuthError, verify_apple_identity_token
 from app.services.oauth_google import GoogleAuthError, verify_google_id_token
 from app.services.feature_flags import require_auth_enabled, require_registration_enabled
+from app.services.usernames import UsernameError, UsernameTakenError, assign_username
 from app.services.verification import create_verification_token, verify_email_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -61,7 +63,18 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> AuthRespon
     if get_user_by_email(db, body.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    user = create_user(db, email=body.email, password=body.password, display_name=body.display_name)
+    try:
+        user = create_user(
+            db,
+            email=body.email,
+            password=body.password,
+            display_name=body.display_name,
+            username=body.username,
+        )
+    except UsernameTakenError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except UsernameError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     verify_url, sent = _send_verification(db, user)
     db.commit()
     db.refresh(user)
@@ -166,6 +179,27 @@ def resend_verification(
 
 @router.get("/me", response_model=UserResponse)
 def me(user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse(**user_to_dict(user))
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    body: UpdateProfileRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> UserResponse:
+    if "display_name" in body.model_fields_set:
+        name = (body.display_name or "").strip() or None
+        user.display_name = name
+    if "username" in body.model_fields_set and body.username is not None:
+        try:
+            assign_username(db, user, body.username)
+        except UsernameTakenError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        except UsernameError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(user)
     return UserResponse(**user_to_dict(user))
 
 

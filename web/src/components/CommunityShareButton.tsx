@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, UsersRound, X } from 'lucide-react'
-import { updateRecipeCommunity } from '../api/client'
+import { updateProfile, updateRecipeCommunity } from '../api/client'
 import { useFeatures } from '../context/FeaturesContext'
+import { useAuth } from '../context/AuthContext'
+import { UsernameField } from './UsernameField'
+import { isUsernameRequiredError } from '../api/errors'
 import type { RecipeDetailResponse } from '../types/recipe'
 
 interface CommunityShareButtonProps {
@@ -17,14 +20,25 @@ export function CommunityShareButton({
   sharedToCommunity,
 }: CommunityShareButtonProps) {
   const features = useFeatures()
+  const { user, refreshUser } = useAuth()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
+  const [username, setUsername] = useState('')
+  const [needsUsername, setNeedsUsername] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
 
   const mutation = useMutation({
-    mutationFn: () => updateRecipeCommunity(recipeId, true),
+    mutationFn: async () => {
+      if (!user?.username) {
+        const handle = username.trim()
+        if (!handle) throw new Error('Choose a username before sharing')
+        await updateProfile({ username: handle })
+        await refreshUser()
+      }
+      return updateRecipeCommunity(recipeId, true)
+    },
     onSuccess: (shared) => {
       queryClient.setQueryData<RecipeDetailResponse>(['recipe', recipeId], (current) =>
         current
@@ -43,6 +57,9 @@ export function CommunityShareButton({
       requestAnimationFrame(() => triggerRef.current?.focus())
     },
     onError: (err) => {
+      if (isUsernameRequiredError(err)) {
+        setNeedsUsername(true)
+      }
       setError(err instanceof Error ? err.message : 'Could not share this recipe')
     },
   })
@@ -76,6 +93,8 @@ export function CommunityShareButton({
     requestAnimationFrame(() => triggerRef.current?.focus())
   }
 
+  const showUsernameField = needsUsername || !user?.username
+
   return (
     <>
       <button
@@ -84,6 +103,8 @@ export function CommunityShareButton({
         onClick={() => {
           if (sharedToCommunity) return
           setError('')
+          setUsername('')
+          setNeedsUsername(!user?.username)
           setOpen(true)
         }}
         aria-disabled={sharedToCommunity}
@@ -137,6 +158,15 @@ export function CommunityShareButton({
               </button>
             </div>
 
+            {showUsernameField && (
+              <div className="px-5 pt-4">
+                <p className="mb-3 text-sm text-stone-600">
+                  Pick a username so other cooks can find and follow you.
+                </p>
+                <UsernameField value={username} onChange={setUsername} autoFocus />
+              </div>
+            )}
+
             {error && (
               <p role="alert" className="mx-5 mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -156,7 +186,7 @@ export function CommunityShareButton({
                 ref={confirmRef}
                 type="button"
                 onClick={() => mutation.mutate()}
-                disabled={mutation.isPending}
+                disabled={mutation.isPending || (showUsernameField && !username.trim())}
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60"
               >
                 {mutation.isPending ? 'Sharing…' : 'Yes, share recipe'}

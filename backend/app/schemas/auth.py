@@ -9,6 +9,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     display_name: Optional[str] = Field(default=None, max_length=120)
+    username: Optional[str] = Field(default=None, max_length=20)
 
 
 class LoginRequest(BaseModel):
@@ -21,10 +22,16 @@ class OAuthTokenRequest(BaseModel):
     display_name: Optional[str] = Field(default=None, max_length=120)
 
 
+class UpdateProfileRequest(BaseModel):
+    display_name: Optional[str] = Field(default=None, max_length=120)
+    username: Optional[str] = Field(default=None, max_length=20)
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
     display_name: Optional[str] = None
+    username: Optional[str] = None
     avatar_url: Optional[str] = None
     email_verified: bool = False
     plan: str = "free"

@@ -5,6 +5,7 @@ import { OAuthButtons } from '../components/OAuthButtons'
 import { useAuth } from '../context/AuthContext'
 import { register } from '../api/client'
 import { postAuthPath, storeDevVerifyUrl } from '../lib/authRedirect'
+import { UsernameField } from '../components/UsernameField'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -14,6 +15,7 @@ export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -22,7 +24,7 @@ export function RegisterPage() {
     setError('')
     setLoading(true)
     try {
-      const data = await register(email, password, displayName || undefined)
+      const data = await register(email, password, displayName || undefined, username || undefined)
       setSession(data.access_token, data.user)
       storeDevVerifyUrl(data.verification_url)
       navigate(postAuthPath(data.user, redirect))
@@ -49,6 +51,7 @@ export function RegisterPage() {
               className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
             />
           </label>
+          <UsernameField value={username} onChange={setUsername} optional />
           <label className="block">
             <span className="text-sm font-medium text-stone-700">Email</span>
             <input

@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import init_db
 from app.schemas.features import FeaturesResponse
 from app.services.feature_flags import build_features_response
-from app.routers import admin, auth, billing, collections, community, ingest, recipes, share
+from app.routers import admin, auth, billing, collections, community, ingest, recipes, share, users
 from app.services.recipe_icons import uploads_root
 
 LAMBDA_MODE = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
@@ -71,6 +71,7 @@ if not LAMBDA_MODE:
 app.include_router(recipes.router)
 app.include_router(share.router)
 app.include_router(community.router)
+app.include_router(users.router)
 app.include_router(collections.router)
 
 if not LAMBDA_MODE and not settings.uploads_bucket:

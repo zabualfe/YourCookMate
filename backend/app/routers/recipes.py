@@ -25,6 +25,7 @@ from app.schemas.shop import InstacartLinkResponse
 from app.services.collections import collections_for_recipe, collections_for_recipe_ids
 from app.services.feature_flags import require_community_enabled
 from app.services.instacart import clear_instacart_cache, get_or_create_instacart_link
+from app.services.pins import PinError, clear_pin, pin_recipe, unpin_recipe
 from app.services.recipe_icons import delete_icon_file, enrich_recipe_step_urls, icon_public_url, save_recipe_icon
 from app.services.share import generate_share_slug
 from app.services.billing import (
@@ -95,6 +96,7 @@ def _recipe_to_detail(row: Recipe, db: Session, owner: User | None = None) -> Re
         icon_url=icon_public_url(row.icon_path),
         locked=locked,
         visible_until=visible_until,
+        pinned_rank=row.pinned_rank,
     )
 
 
@@ -244,8 +246,14 @@ def list_recipes(
     query = db.query(Recipe).filter(Recipe.user_id == user.id)
     if q:
         query = query.filter(Recipe.title.ilike(f"%{q}%"))
-    query = query.order_by(Recipe.created_at.desc())
-    rows = query.all()
+    rows = query.order_by(Recipe.created_at.desc()).all()
+    rows.sort(
+        key=lambda row: (
+            row.pinned_rank is None,
+            row.pinned_rank or 0,
+            -(row.created_at.timestamp() if row.created_at else 0),
+        )
+    )
     recipe_ids = [r.id for r in rows]
     collection_map = collections_for_recipe_ids(db, recipe_ids)
 
@@ -260,6 +268,8 @@ def list_recipes(
             icon_url=icon_public_url(r.icon_path),
             locked=recipe_is_locked(user, r),
             visible_until=(until.isoformat() if (until := recipe_visible_until(user, r)) else None),
+            shared_to_community=r.shared_to_community,
+            pinned_rank=r.pinned_rank,
         )
         for r in rows
     ]
@@ -382,6 +392,7 @@ def update_recipe_share(
         row.share_slug = None
         row.is_public = False
         row.shared_to_community = False
+        clear_pin(db, row)
 
     db.commit()
     db.refresh(row)
@@ -403,16 +414,57 @@ def update_recipe_community(
     assert_recipe_unlocked(user, row)
 
     if body.enabled:
+        if not user.username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "username_required",
+                    "message": "Choose a username before sharing with the community.",
+                },
+            )
         # Community cards open /r/{slug}, so publishing mints an unlisted link if needed.
         if not row.share_slug:
             row.share_slug = generate_share_slug(db)
         row.shared_to_community = True
     else:
         row.shared_to_community = False
+        clear_pin(db, row)
 
     db.commit()
     db.refresh(row)
     return _share_response(row)
+
+
+@router.post("/{recipe_id}/pin", response_model=RecipeDetailResponse)
+def update_recipe_pin(
+    recipe_id: UUID,
+    body: ShareRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> RecipeDetailResponse:
+    require_community_enabled()
+    row = db.query(Recipe).filter(Recipe.id == recipe_id, Recipe.user_id == user.id).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    assert_recipe_unlocked(user, row)
+    try:
+        if body.enabled:
+            pin_recipe(db, user, row)
+        else:
+            unpin_recipe(db, user, row)
+    except PinError as exc:
+        status_code = (
+            status.HTTP_404_NOT_FOUND if exc.code == "not_found" else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+
+    db.commit()
+    db.refresh(row)
+    return _recipe_to_detail(row, db, user)
 
 
 @router.post("/{recipe_id}/instacart-link", response_model=InstacartLinkResponse)

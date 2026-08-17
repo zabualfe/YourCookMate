@@ -32,6 +32,8 @@ class RecipeSummary(BaseModel):
     icon_url: Optional[str] = None
     locked: bool = False
     visible_until: Optional[str] = None
+    shared_to_community: bool = False
+    pinned_rank: Optional[int] = None
 
 
 class RecipeDetailResponse(BaseModel):
@@ -51,6 +53,7 @@ class RecipeDetailResponse(BaseModel):
     icon_url: Optional[str] = None
     locked: bool = False
     visible_until: Optional[str] = None
+    pinned_rank: Optional[int] = None
 
 
 class RecipeListResponse(BaseModel):

@@ -117,7 +117,7 @@ export function SidebarAccount() {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-stone-900">{accountName(user)}</p>
             <p className="truncate text-xs text-stone-500">
-              {isPro ? (billing?.cancel_at_period_end ? 'Pro · canceling' : 'Pro') : 'Free plan'}
+              {user.username ? `@${user.username}` : isPro ? (billing?.cancel_at_period_end ? 'Pro · canceling' : 'Pro') : 'Free plan'}
             </p>
           </div>
         </button>

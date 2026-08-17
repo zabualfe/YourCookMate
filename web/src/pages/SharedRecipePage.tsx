@@ -10,6 +10,8 @@ import { AdSlot } from '../components/AdSlot'
 import { getSharedRecipe, saveSharedRecipe } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { isVideoSourceType } from '../lib/recipeTimestamps'
+import { AuthorLink } from '../components/AuthorLink'
+import { FollowButton } from '../components/FollowButton'
 
 export function SharedRecipePage() {
   const { slug } = useParams<{ slug: string }>()
@@ -134,7 +136,20 @@ export function SharedRecipePage() {
       <div className="mx-auto max-w-3xl px-4 py-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-stone-500">Shared by {data.author_name}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <AuthorLink
+                username={data.author_username}
+                name={data.author_name}
+                avatarUrl={data.author_avatar_url}
+              />
+              {data.author_username && (
+                <FollowButton
+                  username={data.author_username}
+                  isFollowing={Boolean(data.is_following)}
+                  isSelf={Boolean(data.is_self)}
+                />
+              )}
+            </div>
             <div className="mt-3 flex items-start gap-4">
               <RecipeIcon recipeId={data.slug} iconUrl={data.icon_url} size="lg" />
               <div>

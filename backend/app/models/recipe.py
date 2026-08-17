@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func, JSON
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, JSON
 from sqlalchemy.types import Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 class Recipe(Base):
     __tablename__ = "recipes"
+    __table_args__ = (UniqueConstraint("user_id", "pinned_rank", name="uq_recipes_user_pinned_rank"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -36,6 +37,7 @@ class Recipe(Base):
     shared_to_community: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Unlisted share link. Anyone with the slug can view; does not imply community listing.
     share_slug: Mapped[Optional[str]] = mapped_column(String(32), unique=True, nullable=True, index=True)
+    pinned_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     icon_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     instacart_link_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     instacart_ingredients_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

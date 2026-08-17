@@ -79,6 +79,9 @@ def _migrate_schema() -> None:
                 conn.execute(
                     text("ALTER TABLE users ADD COLUMN cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE")
                 )
+        if "username" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR(20)"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)"))
 
     if "recipes" in insp.get_table_names():
         recipe_cols = {c["name"] for c in insp.get_columns("recipes")}
@@ -112,6 +115,14 @@ def _migrate_schema() -> None:
                 conn.execute(text("ALTER TABLE recipes ADD COLUMN expires_at TIMESTAMP WITH TIME ZONE"))
             if "source_key" not in recipe_cols:
                 conn.execute(text("ALTER TABLE recipes ADD COLUMN source_key VARCHAR(128)"))
+            if "pinned_rank" not in recipe_cols:
+                conn.execute(text("ALTER TABLE recipes ADD COLUMN pinned_rank INTEGER"))
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_recipes_user_pinned_rank "
+                        "ON recipes (user_id, pinned_rank)"
+                    )
+                )
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_recipes_source_key ON recipes (source_key)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_recipes_source_url ON recipes (source_url)"))
 
@@ -149,7 +160,7 @@ def _backfill_source_keys() -> None:
 
 
 def init_db() -> None:
-    from app.models import collection, email_verification_token, feature_flag, job, oauth_account, recipe, source_import, usage, user  # noqa: F401
+    from app.models import collection, email_verification_token, feature_flag, follow, job, oauth_account, recipe, source_import, usage, user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _migrate_schema()

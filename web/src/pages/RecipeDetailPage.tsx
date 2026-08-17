@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { ShareQuickAdd } from '../components/SharePanel'
 import { CommunityShareButton } from '../components/CommunityShareButton'
+import { PinRecipeButton } from '../components/PinRecipeButton'
 import { CollectionQuickAdd } from '../components/CollectionPicker'
 import { RecipeCollectionChips } from '../components/RecipeCollectionChips'
 import { RecipeEditor, cloneRecipe, normalizeRecipe, type EditorRecipe } from '../components/RecipeEditor'
@@ -83,6 +84,7 @@ export function RecipeDetailPage() {
         collections: data.collections ?? [],
         is_public: data.is_public ?? false,
         shared_to_community: data.shared_to_community ?? false,
+        pinned_rank: data.pinned_rank ?? null,
         share_url: data.share_url,
         source_url: data.source_url,
         isLocal: false,
@@ -101,6 +103,7 @@ export function RecipeDetailPage() {
           collections: [],
           is_public: false,
           shared_to_community: false,
+          pinned_rank: null as number | null,
           share_url: undefined as string | undefined,
           source_url: local.sourceUrl,
           isLocal: true,
@@ -383,6 +386,11 @@ export function RecipeDetailPage() {
                       <CommunityShareButton
                         recipeId={data.id}
                         recipeTitle={detail.title}
+                        sharedToCommunity={detail.shared_to_community}
+                      />
+                      <PinRecipeButton
+                        recipeId={data.id}
+                        pinnedRank={detail.pinned_rank}
                         sharedToCommunity={detail.shared_to_community}
                       />
                     </>

@@ -60,6 +60,8 @@ export interface RecipeSummary {
   icon_url?: string | null
   locked?: boolean
   visible_until?: string | null
+  shared_to_community?: boolean
+  pinned_rank?: number | null
 }
 
 export interface RecipeListResponse {
@@ -84,6 +86,7 @@ export interface RecipeDetailResponse {
   icon_url?: string | null
   locked?: boolean
   visible_until?: string | null
+  pinned_rank?: number | null
 }
 
 export type { RecipeCollectionTag }

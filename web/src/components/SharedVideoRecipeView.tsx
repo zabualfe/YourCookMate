@@ -6,6 +6,8 @@ import { RecipeNutritionInfo } from './RecipeNutritionInfo'
 import { RecipeSourceLink } from './RecipeSourceLink'
 import { videoPlatformLabel } from '../types/ingest'
 import { AdSlot } from './AdSlot'
+import { AuthorLink } from './AuthorLink'
+import { FollowButton } from './FollowButton'
 
 interface SharedVideoRecipeViewProps {
   slug: string
@@ -33,8 +35,21 @@ export function SharedVideoRecipeView({
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm text-stone-500">Shared by {data.author_name}</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-normal text-stone-900 sm:text-4xl">
+          <div className="flex flex-wrap items-center gap-3">
+            <AuthorLink
+              username={data.author_username}
+              name={data.author_name}
+              avatarUrl={data.author_avatar_url}
+            />
+            {data.author_username && (
+              <FollowButton
+                username={data.author_username}
+                isFollowing={Boolean(data.is_following)}
+                isSelf={Boolean(data.is_self)}
+              />
+            )}
+          </div>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-normal text-stone-900 sm:text-4xl">
             {data.title}
           </h1>
           <p className="mt-2 text-sm text-stone-600">

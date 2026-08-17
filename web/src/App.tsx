@@ -17,6 +17,7 @@ import { SharedCookPage } from './pages/SharedCookPage'
 import { CollectionsPage } from './pages/CollectionsPage'
 import { CollectionDetailPage } from './pages/CollectionDetailPage'
 import { CommunityRecipesPage } from './pages/CommunityRecipesPage'
+import { PublicProfilePage } from './pages/PublicProfilePage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { VerifyEmailConfirmPage } from './pages/VerifyEmailConfirmPage'
 import { AuthMobilePage } from './pages/AuthMobilePage'
@@ -61,6 +62,14 @@ export default function App() {
                 element={
                   <FeatureGate flag="community">
                     <CommunityRecipesPage />
+                  </FeatureGate>
+                }
+              />
+              <Route
+                path="/u/:username"
+                element={
+                  <FeatureGate flag="community">
+                    <PublicProfilePage />
                   </FeatureGate>
                 }
               />

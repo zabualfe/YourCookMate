@@ -44,10 +44,14 @@ export interface CommunityRecipeSummary {
   slug: string
   title: string
   author_name: string
+  author_username?: string | null
+  author_avatar_url?: string | null
   step_count: number
   used_ai: boolean
   created_at: string
   icon_url?: string | null
+  id?: string | null
+  pinned_rank?: number | null
 }
 
 export interface CommunityRecipeListResponse {
@@ -60,6 +64,10 @@ export interface SharedRecipeResponse {
   title: string
   recipe: import('./recipe').ParsedRecipe
   author_name: string
+  author_username?: string | null
+  author_avatar_url?: string | null
+  is_following?: boolean
+  is_self?: boolean
   step_count: number
   used_ai: boolean
   source_type?: string

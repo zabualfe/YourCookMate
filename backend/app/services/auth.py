@@ -51,18 +51,28 @@ def create_user(
     email: str,
     password: Optional[str] = None,
     display_name: Optional[str] = None,
+    username: Optional[str] = None,
     avatar_url: Optional[str] = None,
     email_verified: bool = False,
 ) -> User:
+    from app.services.usernames import UsernameError, assign_username
+
     user = User(
         email=email.lower(),
         password_hash=hash_password(password) if password else None,
-        display_name=display_name,
+        display_name=display_name.strip() if display_name and display_name.strip() else None,
         avatar_url=avatar_url,
         email_verified=email_verified,
     )
     db.add(user)
     db.flush()
+    if username:
+        try:
+            assign_username(db, user, username)
+        except UsernameError:
+            db.delete(user)
+            db.flush()
+            raise
     return user
 
 
@@ -140,6 +150,7 @@ def user_to_dict(user: User) -> dict[str, Any]:
         "id": str(user.id),
         "email": user.email,
         "display_name": user.display_name,
+        "username": user.username,
         "avatar_url": user.avatar_url,
         "email_verified": user.email_verified,
         "plan": "pro" if is_pro(user) else "free",

@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { InstacartConnectCard } from '../components/InstacartConnectCard'
 import { UpgradePaywall } from '../components/UpgradePaywall'
+import { UsernameField } from '../components/UsernameField'
 import { useAuth } from '../context/AuthContext'
-import { getBillingPlans } from '../api/client'
+import { getBillingPlans, updateProfile } from '../api/client'
 import { ProBillingActions } from '../components/ProBillingActions'
 import { uploadsLeftLabel, videoLimitLabel } from '../types/billing'
 
@@ -62,6 +64,7 @@ export function ProfilePage() {
             <p className="truncate text-lg font-semibold text-stone-900">
               {user.display_name ?? user.email.split('@')[0]}
             </p>
+            {user.username && <p className="truncate text-sm text-stone-500">@{user.username}</p>}
             <p className="truncate text-sm text-stone-500">{user.email}</p>
             <p className="mt-1 text-xs text-stone-500">
               {isPro ? (
@@ -85,6 +88,8 @@ export function ProfilePage() {
             </p>
           </div>
         </div>
+
+        <ProfileIdentityForm />
 
         <section className="mt-6 rounded-2xl border border-stone-200 bg-white p-6">
           <h2 className="text-base font-semibold text-stone-900">Plan</h2>
@@ -126,5 +131,73 @@ export function ProfilePage() {
         </Link>
       </div>
     </Layout>
+  )
+}
+
+function ProfileIdentityForm() {
+  const { user, refreshUser } = useAuth()
+  const [displayName, setDisplayName] = useState(user?.display_name ?? '')
+  const [username, setUsername] = useState(user?.username ?? '')
+  const [message, setMessage] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateProfile({
+        display_name: displayName.trim() || null,
+        username: username.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      await refreshUser()
+      setMessage('Profile saved')
+    },
+    onError: (err) => {
+      setMessage(err instanceof Error ? err.message : 'Could not save profile')
+    },
+  })
+
+  if (!user) return null
+
+  return (
+    <form
+      className="mt-6 space-y-4 rounded-2xl border border-stone-200 bg-white p-6"
+      onSubmit={(e) => {
+        e.preventDefault()
+        setMessage('')
+        mutation.mutate()
+      }}
+    >
+      <div>
+        <h2 className="text-base font-semibold text-stone-900">Public identity</h2>
+        <p className="mt-1 text-sm text-stone-600">
+          Your display name is shown to other cooks. Your username is your public handle.
+        </p>
+      </div>
+      <label className="block">
+        <span className="text-sm font-medium text-stone-700">Display name</span>
+        <input
+          type="text"
+          value={displayName}
+          maxLength={120}
+          onChange={(e) => setDisplayName(e.target.value)}
+          className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+        />
+      </label>
+      <UsernameField value={username} onChange={setUsername} />
+      {user.username && (
+        <Link to={`/u/${encodeURIComponent(user.username)}`} className="inline-block text-sm font-medium text-brand-600">
+          View public profile →
+        </Link>
+      )}
+      {message && (
+        <p className={`text-sm ${message === 'Profile saved' ? 'text-green-700' : 'text-red-700'}`}>{message}</p>
+      )}
+      <button
+        type="submit"
+        disabled={mutation.isPending}
+        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+      >
+        {mutation.isPending ? 'Saving…' : 'Save profile'}
+      </button>
+    </form>
   )
 }

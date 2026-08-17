@@ -23,6 +23,10 @@ class SharedRecipeResponse(BaseModel):
     title: str
     recipe: ParsedRecipe
     author_name: str
+    author_username: Optional[str] = None
+    author_avatar_url: Optional[str] = None
+    is_following: bool = False
+    is_self: bool = False
     step_count: int
     used_ai: bool
     source_type: str = "text"
@@ -36,10 +40,14 @@ class CommunityRecipeSummary(BaseModel):
     slug: str
     title: str
     author_name: str
+    author_username: Optional[str] = None
+    author_avatar_url: Optional[str] = None
     step_count: int
     used_ai: bool
     created_at: str
     icon_url: Optional[str] = None
+    id: Optional[str] = None
+    pinned_rank: Optional[int] = None
 
 
 class CommunityRecipeListResponse(BaseModel):

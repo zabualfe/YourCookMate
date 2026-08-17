@@ -23,6 +23,7 @@ function shouldShowSidebar(pathname: string, hideNav?: boolean, override?: boole
     '/recipes',
     '/collections',
     '/community',
+    '/u',
     '/profile',
     '/plans',
     '/new',
@@ -74,19 +75,20 @@ export function Layout({ children, hideNav, showSidebar }: LayoutProps) {
                   Add recipe
                 </Link>
 
-                {!loading &&
-                  features.auth &&
-                  (isAuthenticated ? (
+                {features.auth &&
+                  (user ? (
                     <div className="ml-1 border-l border-stone-200 pl-2 sm:ml-2 sm:pl-3">
                       <UserMenu />
                     </div>
                   ) : (
-                    <Link
-                      to="/login"
-                      className="ml-1 rounded-lg border border-stone-200 px-3.5 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 sm:ml-2"
-                    >
-                      Sign in
-                    </Link>
+                    !loading && (
+                      <Link
+                        to="/login"
+                        className="ml-1 rounded-lg border border-stone-200 px-3.5 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 sm:ml-2"
+                      >
+                        Sign in
+                      </Link>
+                    )
                   ))}
               </nav>
             </div>

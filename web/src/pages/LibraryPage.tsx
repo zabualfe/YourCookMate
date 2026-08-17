@@ -8,6 +8,7 @@ import { RecipeIcon } from '../components/RecipeIcon'
 import { VisibilityTimer } from '../components/VisibilityTimer'
 import { useAuth } from '../context/AuthContext'
 import { deleteRecipe, listRecipes } from '../api/client'
+import { PinRecipeButton } from '../components/PinRecipeButton'
 import { AdSlot } from '../components/AdSlot'
 import { shouldInsertInFeedAd } from '../lib/adsense'
 
@@ -96,7 +97,14 @@ export function LibraryPage() {
               <div className="flex items-start gap-3">
                 <RecipeIcon recipeId={item.id} iconUrl={item.icon_url} size="sm" />
                 <Link to={`/recipes/${item.id}`} className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-stone-900">{item.title}</p>
+                  <p className="truncate font-semibold text-stone-900">
+                    {item.pinned_rank ? (
+                      <span className="mr-2 inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800">
+                        Pinned {item.pinned_rank}
+                      </span>
+                    ) : null}
+                    {item.title}
+                  </p>
                   <div className="mt-0.5 flex flex-wrap items-center gap-2">
                     <p className="text-sm text-stone-500">
                       {item.locked
@@ -110,6 +118,14 @@ export function LibraryPage() {
                 <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
                   {(item.collections?.length ?? 0) === 0 && !item.locked && (
                     <CollectionQuickAdd recipeId={item.id} collections={item.collections ?? []} />
+                  )}
+                  {!item.locked && (
+                    <PinRecipeButton
+                      recipeId={item.id}
+                      pinnedRank={item.pinned_rank}
+                      sharedToCommunity={item.shared_to_community}
+                      compact
+                    />
                   )}
                   {item.locked ? (
                     <Link
