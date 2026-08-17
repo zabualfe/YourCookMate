@@ -12,12 +12,14 @@ interface CommunityShareButtonProps {
   recipeId: string
   recipeTitle: string
   sharedToCommunity: boolean
+  compact?: boolean
 }
 
 export function CommunityShareButton({
   recipeId,
   recipeTitle,
   sharedToCommunity,
+  compact,
 }: CommunityShareButtonProps) {
   const features = useFeatures()
   const { user, refreshUser } = useAuth()
@@ -109,10 +111,14 @@ export function CommunityShareButton({
         }}
         aria-disabled={sharedToCommunity}
         className={[
-          'inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600',
+          compact
+            ? 'inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
+            : 'inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600',
           sharedToCommunity
             ? 'cursor-default border-blue-200 bg-blue-50 text-blue-700'
-            : 'cursor-pointer border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700',
+            : compact
+              ? 'cursor-pointer border-stone-200 text-stone-700 hover:bg-stone-50'
+              : 'cursor-pointer border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700',
         ].join(' ')}
       >
         {sharedToCommunity ? (
@@ -120,7 +126,7 @@ export function CommunityShareButton({
         ) : (
           <UsersRound className="size-4" strokeWidth={2} aria-hidden />
         )}
-        {sharedToCommunity ? 'Shared with Community' : 'Share with Community'}
+        {sharedToCommunity ? (compact ? 'Shared' : 'Shared with Community') : compact ? 'Community' : 'Share with Community'}
       </button>
 
       {open && (

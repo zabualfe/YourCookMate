@@ -221,156 +221,173 @@ export function RecipeDetailPage() {
             ← Back
           </Link>
 
-          <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-start gap-4">
-              <RecipeIcon
-                recipeId={detail.id}
-                iconUrl={iconUrl}
-                editable={!editing && !detail.locked}
-                isLocal={detail.isLocal}
-                onIconChange={(url) => {
-                  setIconUrl(url)
-                  if (isAuthenticated && data && id) {
-                    queryClient.setQueryData(['recipe', id], { ...data, icon_url: url })
-                    queryClient.setQueriesData<RecipeListResponse>(
-                      { queryKey: ['recipes'] },
-                      (old) => {
-                        if (!old) return old
-                        return {
-                          ...old,
-                          items: old.items.map((item) =>
-                            item.id === id ? { ...item, icon_url: url } : item,
-                          ),
+          <div className="mt-3 flex items-start gap-4">
+            <RecipeIcon
+              recipeId={detail.id}
+              iconUrl={iconUrl}
+              editable={!editing && !detail.locked}
+              isLocal={detail.isLocal}
+              onIconChange={(url) => {
+                setIconUrl(url)
+                if (isAuthenticated && data && id) {
+                  queryClient.setQueryData(['recipe', id], { ...data, icon_url: url })
+                  queryClient.setQueriesData<RecipeListResponse>(
+                    { queryKey: ['recipes'] },
+                    (old) => {
+                      if (!old) return old
+                      return {
+                        ...old,
+                        items: old.items.map((item) =>
+                          item.id === id ? { ...item, icon_url: url } : item,
+                        ),
+                      }
+                    },
+                  )
+                } else if (detail.isLocal) {
+                  setLocal(getLocalRecipe(detail.id))
+                }
+              }}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  {editing && draft ? (
+                    <>
+                      <input
+                        value={draft.title}
+                        onChange={(e) => updateMeta({ title: e.target.value })}
+                        className="w-full rounded-xl border border-brand-200 bg-white px-3 py-2 text-2xl font-bold text-stone-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 sm:text-3xl"
+                        placeholder="Recipe title"
+                      />
+                      {detail.source_url && (
+                        <RecipeSourceLink url={detail.source_url} className="mt-2" />
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+                        {detail.title}
+                      </h1>
+                      {detail.source_url && (
+                        <RecipeSourceLink url={detail.source_url} className="mt-2" />
+                      )}
+                    </>
+                  )}
+
+                  {editing && draft ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone-600">
+                      <label className="flex items-center gap-1.5">
+                        Servings
+                        <input
+                          type="number"
+                          min={1}
+                          value={draft.servings ?? ''}
+                          onChange={(e) =>
+                            updateMeta({
+                              servings: e.target.value ? Number(e.target.value) : null,
+                            })
+                          }
+                          className={metaInputClass}
+                        />
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        Prep (min)
+                        <input
+                          type="number"
+                          min={0}
+                          value={draft.prep_time_minutes ?? ''}
+                          onChange={(e) =>
+                            updateMeta({
+                              prep_time_minutes: e.target.value ? Number(e.target.value) : null,
+                            })
+                          }
+                          className={metaInputClass}
+                        />
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        Cook (min)
+                        <input
+                          type="number"
+                          min={0}
+                          value={draft.cook_time_minutes ?? ''}
+                          onChange={(e) =>
+                            updateMeta({
+                              cook_time_minutes: e.target.value ? Number(e.target.value) : null,
+                            })
+                          }
+                          className={metaInputClass}
+                        />
+                      </label>
+                      <RecipeNutritionFields
+                        calories={draft.calories_per_serving}
+                        allergens={draft.allergens}
+                        onCaloriesChange={(calories_per_serving) =>
+                          updateMeta({ calories_per_serving })
                         }
-                      },
-                    )
-                  } else if (detail.isLocal) {
-                    setLocal(getLocalRecipe(detail.id))
-                  }
-                }}
-              />
-              <div className="min-w-0 flex-1">
-              {editing && draft ? (
-                <>
-                  <input
-                    value={draft.title}
-                    onChange={(e) => updateMeta({ title: e.target.value })}
-                    className="w-full rounded-xl border border-brand-200 bg-white px-3 py-2 text-2xl font-bold text-stone-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 sm:text-3xl"
-                    placeholder="Recipe title"
-                  />
-                  {detail.source_url && (
-                    <RecipeSourceLink url={detail.source_url} className="mt-2" />
+                        onAllergensChange={(allergens) => updateMeta({ allergens })}
+                        inputClass={metaInputClass}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-stone-500">{metaParts.join(' · ')}</p>
+                      <VisibilityTimer
+                        className="mt-2"
+                        locked={detail.locked}
+                        visibleUntil={detail.visible_until}
+                      />
+                      <RecipeNutritionInfo recipe={displayRecipe} className="mt-2" />
+                    </>
                   )}
-                </>
-              ) : (
-                <>
-                  <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-                    {detail.title}
-                  </h1>
-                  {detail.source_url && (
-                    <RecipeSourceLink url={detail.source_url} className="mt-2" />
+
+                  {!editing && detail.collections.length > 0 && (
+                    <div className="mt-2">
+                      <RecipeCollectionChips collections={detail.collections} />
+                    </div>
                   )}
-                </>
-              )}
-
-              {editing && draft ? (
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone-600">
-                  <label className="flex items-center gap-1.5">
-                    Servings
-                    <input
-                      type="number"
-                      min={1}
-                      value={draft.servings ?? ''}
-                      onChange={(e) =>
-                        updateMeta({
-                          servings: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className={metaInputClass}
-                    />
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    Prep (min)
-                    <input
-                      type="number"
-                      min={0}
-                      value={draft.prep_time_minutes ?? ''}
-                      onChange={(e) =>
-                        updateMeta({
-                          prep_time_minutes: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className={metaInputClass}
-                    />
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    Cook (min)
-                    <input
-                      type="number"
-                      min={0}
-                      value={draft.cook_time_minutes ?? ''}
-                      onChange={(e) =>
-                        updateMeta({
-                          cook_time_minutes: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className={metaInputClass}
-                    />
-                  </label>
-                  <RecipeNutritionFields
-                    calories={draft.calories_per_serving}
-                    allergens={draft.allergens}
-                    onCaloriesChange={(calories_per_serving) => updateMeta({ calories_per_serving })}
-                    onAllergensChange={(allergens) => updateMeta({ allergens })}
-                    inputClass={metaInputClass}
-                  />
                 </div>
-              ) : (
-                <>
-                  <p className="mt-1 text-sm text-stone-500">{metaParts.join(' · ')}</p>
-                  <VisibilityTimer
-                    className="mt-2"
-                    locked={detail.locked}
-                    visibleUntil={detail.visible_until}
-                  />
-                  <RecipeNutritionInfo recipe={displayRecipe} className="mt-2" />
-                </>
-              )}
 
-              {!editing && detail.collections.length > 0 && (
-                <div className="mt-2">
-                  <RecipeCollectionChips collections={detail.collections} />
-                </div>
-              )}
+                {detail.locked ? null : editing ? (
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      disabled={saveMutation.isPending}
+                      className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={saveMutation.isPending}
+                      className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex shrink-0 flex-col items-stretch gap-2 lg:items-end">
+                    <Link
+                      to={`/cook/${detail.id}`}
+                      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-600/20 transition hover:bg-brand-700"
+                    >
+                      <CookwareIcon />
+                      Start cooking
+                    </Link>
+                    {isAuthenticated && data && (
+                      <ShopInstacartButton recipeId={data.id} />
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
 
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {detail.locked ? null : editing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={cancelEditing}
-                    disabled={saveMutation.isPending}
-                    className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saveMutation.isPending}
-                    className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-                  >
-                    {saveMutation.isPending ? 'Saving…' : 'Save changes'}
-                  </button>
-                </>
-              ) : (
-                <>
+              {detail.locked || editing ? null : (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={startEditing}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-stone-200 px-3.5 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
                   >
                     <PencilIcon />
                     Edit
@@ -387,25 +404,17 @@ export function RecipeDetailPage() {
                         recipeId={data.id}
                         recipeTitle={detail.title}
                         sharedToCommunity={detail.shared_to_community}
+                        compact
                       />
                       <PinRecipeButton
                         recipeId={data.id}
                         pinnedRank={detail.pinned_rank}
                         sharedToCommunity={detail.shared_to_community}
+                        compact
                       />
                     </>
                   )}
-                  <Link
-                    to={`/cook/${detail.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-600/20 transition hover:bg-brand-700"
-                  >
-                    <CookwareIcon />
-                    Start cooking
-                  </Link>
-                  {isAuthenticated && data && (
-                    <ShopInstacartButton recipeId={data.id} />
-                  )}
-                </>
+                </div>
               )}
             </div>
           </div>
