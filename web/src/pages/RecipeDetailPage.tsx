@@ -15,6 +15,7 @@ import { CookwareIcon, PencilIcon } from '../components/icons'
 import { getRecipe as getLocalRecipe, saveRecipe as saveLocalRecipe } from '../lib/storage'
 import { UpgradePaywall } from '../components/UpgradePaywall'
 import { VisibilityTimer } from '../components/VisibilityTimer'
+import { AdSlot } from '../components/AdSlot'
 import { getBillingUsage, getRecipe as getRecipeApi, updateRecipe } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type { ParsedRecipe, RecipeListResponse } from '../types/recipe'
@@ -405,6 +406,8 @@ export function RecipeDetailPage() {
             <p className="mt-3 rounded-xl bg-red-50 px-4 py-2 text-sm text-red-700">{saveError}</p>
           )}
         </div>
+
+        {!detail.locked && !editing && <AdSlot variant="cook" className="mt-3 shrink-0" />}
 
         {detail.locked ? (
           <div className="mt-6">

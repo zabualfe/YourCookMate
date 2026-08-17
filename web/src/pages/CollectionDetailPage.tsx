@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { getCollection, removeRecipeFromCollection, updateCollection } from '../api/client'
 import { VisibilityTimer } from '../components/VisibilityTimer'
+import { AdSlot } from '../components/AdSlot'
+import { shouldInsertInFeedAd } from '../lib/adsense'
 
 export function CollectionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -118,9 +120,9 @@ export function CollectionDetailPage() {
         )}
 
         <ul className="mt-6 space-y-3">
-          {data.recipes.map((item) => (
+          {data.recipes.map((item, index) => (
+            <Fragment key={item.id}>
             <li
-              key={item.id}
               className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4"
             >
               <Link to={`/recipes/${item.id}`} className="min-w-0 flex-1">
@@ -155,8 +157,15 @@ export function CollectionDetailPage() {
                 Remove
               </button>
             </li>
+            {shouldInsertInFeedAd(index, data.recipes.length) && (
+              <li>
+                <AdSlot variant="infeed" />
+              </li>
+            )}
+            </Fragment>
           ))}
         </ul>
+        {data.recipes.length > 0 && <AdSlot variant="banner" className="mt-6" />}
       </div>
     </Layout>
   )

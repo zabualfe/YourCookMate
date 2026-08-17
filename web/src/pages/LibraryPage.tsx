@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
@@ -8,6 +8,8 @@ import { RecipeIcon } from '../components/RecipeIcon'
 import { VisibilityTimer } from '../components/VisibilityTimer'
 import { useAuth } from '../context/AuthContext'
 import { deleteRecipe, listRecipes } from '../api/client'
+import { AdSlot } from '../components/AdSlot'
+import { shouldInsertInFeedAd } from '../lib/adsense'
 
 export function LibraryPage() {
   const { isAuthenticated, loading: authLoading } = useAuth()
@@ -86,9 +88,9 @@ export function LibraryPage() {
         )}
 
         <ul className="mt-6 space-y-3">
-          {data?.items.map((item) => (
+          {data?.items.map((item, index) => (
+            <Fragment key={item.id}>
             <li
-              key={item.id}
               className="rounded-2xl border border-stone-200 bg-white p-4"
             >
               <div className="flex items-start gap-3">
@@ -136,8 +138,15 @@ export function LibraryPage() {
                 </div>
               </div>
             </li>
+            {data && shouldInsertInFeedAd(index, data.items.length) && (
+              <li>
+                <AdSlot variant="infeed" />
+              </li>
+            )}
+            </Fragment>
           ))}
         </ul>
+        {data && data.items.length > 0 && <AdSlot variant="banner" className="mt-6" />}
       </div>
     </Layout>
   )

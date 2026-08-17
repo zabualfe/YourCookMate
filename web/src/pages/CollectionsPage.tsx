@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { createCollection, deleteCollection, listCollections } from '../api/client'
+import { AdSlot } from '../components/AdSlot'
 
 export function CollectionsPage() {
   const { isAuthenticated, loading: authLoading } = useAuth()
@@ -125,6 +126,7 @@ export function CollectionsPage() {
             </li>
           ))}
         </ul>
+        {data && data.items.length > 0 && <AdSlot variant="banner" className="mt-6" />}
       </div>
     </Layout>
   )

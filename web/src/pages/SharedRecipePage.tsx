@@ -6,6 +6,7 @@ import { RecipeNutritionInfo } from '../components/RecipeNutritionInfo'
 import { RecipeSourceLink } from '../components/RecipeSourceLink'
 import { SharedVideoRecipeView } from '../components/SharedVideoRecipeView'
 import { ShopInstacartButton } from '../components/ShopInstacartButton'
+import { AdSlot } from '../components/AdSlot'
 import { getSharedRecipe, saveSharedRecipe } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { isVideoSourceType } from '../lib/recipeTimestamps'
@@ -164,6 +165,8 @@ export function SharedRecipePage() {
             ))}
           </ul>
         </section>
+
+        <AdSlot variant="banner" className="mt-8" />
 
         <section className="mt-8">
           <h2 className="mb-3 font-semibold">Steps preview</h2>

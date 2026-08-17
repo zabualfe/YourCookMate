@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Layout } from '../components/Layout'
 import { RecipeIcon } from '../components/RecipeIcon'
+import { AdSlot } from '../components/AdSlot'
 import { listCommunityRecipes } from '../api/client'
+import { shouldInsertInFeedAd } from '../lib/adsense'
 
 export function CommunityRecipesPage() {
   const [search, setSearch] = useState('')
@@ -55,9 +57,9 @@ export function CommunityRecipesPage() {
         )}
 
         <ul className="mt-6 space-y-3">
-          {data?.items.map((item) => (
+          {data?.items.map((item, index) => (
+            <Fragment key={item.slug}>
             <li
-              key={item.slug}
               className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4"
             >
               <RecipeIcon recipeId={item.slug} iconUrl={item.icon_url} size="sm" />
@@ -75,8 +77,15 @@ export function CommunityRecipesPage() {
                 Cook
               </Link>
             </li>
+            {data && shouldInsertInFeedAd(index, data.items.length) && (
+              <li>
+                <AdSlot variant="infeed" />
+              </li>
+            )}
+            </Fragment>
           ))}
         </ul>
+        {data && data.items.length > 0 && <AdSlot variant="banner" className="mt-6" />}
       </div>
     </Layout>
   )

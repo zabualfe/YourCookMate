@@ -5,6 +5,7 @@ import { resolveVideoEmbed } from '../lib/videoEmbed'
 import { RecipeNutritionInfo } from './RecipeNutritionInfo'
 import { RecipeSourceLink } from './RecipeSourceLink'
 import { videoPlatformLabel } from '../types/ingest'
+import { AdSlot } from './AdSlot'
 
 interface SharedVideoRecipeViewProps {
   slug: string
@@ -48,6 +49,8 @@ export function SharedVideoRecipeView({
       {saveError && (
         <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</p>
       )}
+
+      <AdSlot variant="banner" className="mt-8" />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
         <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-950 shadow-xl">

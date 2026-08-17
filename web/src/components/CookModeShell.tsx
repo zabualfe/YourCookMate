@@ -7,6 +7,8 @@ import { ingredientsForStep } from '../lib/recipeTimestamps'
 import { IngredientDrawer } from './IngredientDrawer'
 import { StepCard } from './StepCard'
 import { StepNavigator } from './StepNavigator'
+import { AdSlot } from './AdSlot'
+import { useShowAds } from '../hooks/useShowAds'
 
 interface CookModeShellProps {
   recipe: ParsedRecipe
@@ -19,6 +21,7 @@ export function CookModeShell({ recipe, recipeId }: CookModeShellProps) {
     recipe.steps,
   )
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const showAds = useShowAds()
 
   const neededIngredients = useMemo(
     () => ingredientsForStep(recipe, currentStep ?? null),
@@ -100,23 +103,30 @@ export function CookModeShell({ recipe, recipeId }: CookModeShellProps) {
 
       <div className="flex w-full flex-1 overflow-hidden">
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          <AnimatePresence mode="wait">
-            {currentStep && (
-              <motion.div
-                key={currentStep.order}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="absolute inset-0 overflow-y-auto"
-              >
-                <StepCard
-                  step={currentStep}
-                  stepNumber={currentIndex + 1}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="relative min-h-0 flex-1">
+            <AnimatePresence mode="wait">
+              {currentStep && (
+                <motion.div
+                  key={currentStep.order}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute inset-0 overflow-y-auto"
+                >
+                  <StepCard
+                    step={currentStep}
+                    stepNumber={currentIndex + 1}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          {showAds && (
+            <div className="shrink-0 px-4 py-2">
+              <AdSlot variant="cook" />
+            </div>
+          )}
         </div>
 
         <aside className="hidden w-72 shrink-0 items-center justify-center self-stretch px-4 py-6 sm:flex xl:w-80">

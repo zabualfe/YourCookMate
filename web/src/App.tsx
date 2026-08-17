@@ -23,6 +23,7 @@ import { AuthMobilePage } from './pages/AuthMobilePage'
 import { AdminPage } from './pages/AdminPage'
 import { BillingSuccessPage } from './pages/BillingSuccessPage'
 import { PlansPage } from './pages/PlansPage'
+import { AdSenseGate } from './components/AdSenseGate'
 
 const queryClient = new QueryClient()
 
@@ -31,6 +32,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <FeaturesProvider>
         <AuthProvider>
+          <AdSenseGate />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<LandingPage />} />

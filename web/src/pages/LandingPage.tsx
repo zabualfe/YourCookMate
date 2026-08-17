@@ -6,6 +6,7 @@ import { ProductPreviewBanner } from '../components/ProductPreviewBanner'
 import { useAuth } from '../context/AuthContext'
 import { listRecipes } from '../api/client'
 import { getRecentRecipes } from '../lib/storage'
+import { AdSlot } from '../components/AdSlot'
 
 const FEATURES = [
   {
@@ -128,6 +129,10 @@ export function LandingPage() {
           </ul>
         </div>
       </section>
+
+      <div className="px-4 sm:px-6 lg:px-8">
+        <AdSlot variant="banner" className="mx-auto my-6 max-w-3xl" />
+      </div>
 
       {/* Recent recipes (returning users) */}
       {recent.length > 0 && (
